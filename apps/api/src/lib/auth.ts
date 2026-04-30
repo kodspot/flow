@@ -29,8 +29,9 @@ export async function verifyJwt(secret: string, token: string): Promise<JwtPaylo
   }
 }
 
-// PBKDF2 password hashing — works on Workers (no Node crypto)
-const PBKDF2_ITERS = 210_000;
+// PBKDF2 password hashing — works on Workers (no Node crypto).
+// Cloudflare Workers Web Crypto caps PBKDF2 iterations at 100,000.
+const PBKDF2_ITERS = 100_000;
 
 export async function hashPassword(password: string): Promise<string> {
   const salt = crypto.getRandomValues(new Uint8Array(16));

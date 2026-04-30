@@ -17,10 +17,10 @@ export class InvoiceCounter extends DurableObject {
 
   async next(year: number): Promise<{ year: number; sequence: number }> {
     return await this.ctx.blockConcurrencyWhile(async () => {
-      const row = this.ctx.storage.sql
+      const rows = this.ctx.storage.sql
         .exec<{ last: number }>('SELECT last FROM counters WHERE year = ?', year)
-        .one();
-      const next = (row?.last ?? 0) + 1;
+        .toArray();
+      const next = (rows[0]?.last ?? 0) + 1;
       this.ctx.storage.sql.exec(
         `INSERT INTO counters(year, last) VALUES(?, ?) ON CONFLICT(year) DO UPDATE SET last = excluded.last`,
         year,
@@ -31,10 +31,10 @@ export class InvoiceCounter extends DurableObject {
   }
 
   async peek(year: number): Promise<number> {
-    const row = this.ctx.storage.sql
+    const rows = this.ctx.storage.sql
       .exec<{ last: number }>('SELECT last FROM counters WHERE year = ?', year)
-      .one();
-    return row?.last ?? 0;
+      .toArray();
+    return rows[0]?.last ?? 0;
   }
 
   // Allow setting starting value (e.g. when migrating existing invoices)

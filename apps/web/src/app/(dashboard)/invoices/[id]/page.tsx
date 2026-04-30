@@ -1,0 +1,106 @@
+'use client';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { useParams } from 'next/navigation';
+import { api } from '@/lib/api';
+import { formatINRCompact } from '@kodspot/shared/money';
+import { toast } from 'sonner';
+import { Download, FileCheck, Eye } from 'lucide-react';
+
+const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8787';
+
+export default function InvoiceDetailPage() {
+  const { id } = useParams<{ id: string }>();
+  const qc = useQueryClient();
+  const { data, isLoading } = useQuery({
+    queryKey: ['invoice', id],
+    queryFn: () => api<{ invoice: any; items: any[] }>(`/v1/invoices/${id}`),
+  });
+
+  const generatePdf = useMutation({
+    mutationFn: () => api<{ pdfKey: string; downloadUrl: string }>(`/v1/invoices/${id}/pdf`, { method: 'POST' }),
+    onSuccess: () => { toast.success('PDF generated'); qc.invalidateQueries({ queryKey: ['invoice', id] }); },
+    onError: (e) => toast.error((e as Error).message),
+  });
+
+  const markPaid = useMutation({
+    mutationFn: () => api(`/v1/invoices/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'paid' }) }),
+    onSuccess: () => { toast.success('Marked paid'); qc.invalidateQueries({ queryKey: ['invoice', id] }); },
+  });
+
+  if (isLoading || !data) return <div>Loading…</div>;
+  const { invoice, items } = data;
+
+  return (
+    <div className="space-y-6 max-w-5xl">
+      <div className="flex items-center justify-between">
+        <div>
+          <h1 className="text-2xl font-bold font-mono text-kodspot">{invoice.invoiceNumber}</h1>
+          <p className="text-sm text-slate-500">
+            {new Date(invoice.invoiceDate).toLocaleDateString('en-IN')} · Status: <b>{invoice.status}</b>
+          </p>
+        </div>
+        <div className="flex gap-2">
+          <a
+            href={`${API}/v1/invoices/${id}/preview`}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-semibold"
+          >
+            <Eye className="size-4" /> Preview HTML
+          </a>
+          <button
+            onClick={() => generatePdf.mutate()}
+            disabled={generatePdf.isPending}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-kodspot text-white text-sm font-semibold disabled:opacity-50"
+          >
+            <Download className="size-4" /> {generatePdf.isPending ? 'Generating…' : 'Generate PDF'}
+          </button>
+          {invoice.pdfR2Key && (
+            <a
+              href={`${API}/v1/invoices/${id}/pdf/download`}
+              target="_blank"
+              rel="noreferrer"
+              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold"
+            >
+              <Download className="size-4" /> Download PDF
+            </a>
+          )}
+          {invoice.status !== 'paid' && (
+            <button onClick={() => markPaid.mutate()} className="inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-semibold">
+              <FileCheck className="size-4" /> Mark paid
+            </button>
+          )}
+        </div>
+      </div>
+
+      <div className="bg-white border rounded-xl p-6">
+        <div className="grid grid-cols-2 gap-6 mb-6">
+          <div>
+            <div className="text-xs uppercase text-slate-500">Subtotal</div>
+            <div className="text-xl font-bold">{formatINRCompact(invoice.subtotalPaise)}</div>
+          </div>
+          <div>
+            <div className="text-xs uppercase text-slate-500">Total</div>
+            <div className="text-xl font-bold text-kodspot">{formatINRCompact(invoice.totalPaise)}</div>
+          </div>
+        </div>
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 text-xs uppercase">
+            <tr><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2">Period</th><th className="px-3 py-2">Rate</th><th className="px-3 py-2">Days</th><th className="px-3 py-2 text-right">Amount</th></tr>
+          </thead>
+          <tbody>
+            {items.map((it) => (
+              <tr key={it.id} className="border-t">
+                <td className="px-3 py-2">{it.description}</td>
+                <td className="px-3 py-2 text-center">{it.period ?? '—'}</td>
+                <td className="px-3 py-2 text-center">{it.rateLabel ?? '—'}</td>
+                <td className="px-3 py-2 text-center">{it.days ?? '—'}</td>
+                <td className="px-3 py-2 text-right">{formatINRCompact(it.amountPaise)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+}

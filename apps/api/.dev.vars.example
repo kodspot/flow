@@ -1,0 +1,16 @@
+# Local development variables — DO NOT COMMIT
+# Copy to .dev.vars (gitignored) and fill values
+
+JWT_SECRET = "change-me-to-64-random-chars"
+AUTH_SECRET = "change-me-to-64-random-chars"
+ENCRYPTION_KEY = "change-me-to-32-bytes-base64"
+
+RESEND_API_KEY = ""
+RESEND_FROM_EMAIL = "invoices@kodspot.co.in"
+
+WHATSAPP_PHONE_NUMBER_ID = ""
+WHATSAPP_ACCESS_TOKEN = ""
+WHATSAPP_VERIFY_TOKEN = ""
+
+R2_PUBLIC_DOMAIN = ""
+SENTRY_DSN = ""

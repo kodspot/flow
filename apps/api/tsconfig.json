@@ -1,0 +1,13 @@
+{
+  "extends": "../../tsconfig.base.json",
+  "compilerOptions": {
+    "types": ["@cloudflare/workers-types"],
+    "jsx": "react-jsx",
+    "noEmit": true,
+    "paths": {
+      "@kodspot/shared": ["../../packages/shared/src/index.ts"],
+      "@kodspot/shared/*": ["../../packages/shared/src/*"]
+    }
+  },
+  "include": ["src/**/*", "drizzle.config.ts", "scripts/**/*"]
+}

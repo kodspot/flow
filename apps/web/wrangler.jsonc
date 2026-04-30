@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "kodspot-flow-web",
+  "main": ".open-next/worker.js",
+  "compatibility_date": "2025-04-01",
+  "compatibility_flags": ["nodejs_compat", "global_fetch_strictly_public"],
+  "account_id": "6c3e32d5c70cfd7299332508a1f1bfad",
+  "workers_dev": false,
+  "preview_urls": false,
+  "routes": [
+    { "pattern": "flow.kodspot.co.in", "custom_domain": true }
+  ],
+  "assets": {
+    "directory": ".open-next/assets",
+    "binding": "ASSETS"
+  },
+  "observability": { "enabled": true },
+  "vars": {
+    "NEXT_PUBLIC_API_URL": "https://api.flow.kodspot.co.in"
+  }
+}

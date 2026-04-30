@@ -18,6 +18,22 @@ import type { Env, AppVariables } from '../env.js';
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 app.use('*', authMiddleware);
 
+/** Read an R2 asset and return it as a base64 data URL for inline embedding in HTML. */
+async function r2KeyToDataUrl(bucket: R2Bucket, key: string | null | undefined): Promise<string | null> {
+  if (!key) return null;
+  const obj = await bucket.get(key);
+  if (!obj) return null;
+  const ct = obj.httpMetadata?.contentType ?? 'image/png';
+  const buf = new Uint8Array(await obj.arrayBuffer());
+  // Base64-encode in chunks to avoid stack overflow on large buffers
+  let binary = '';
+  const CHUNK = 0x8000;
+  for (let i = 0; i < buf.length; i += CHUNK) {
+    binary += String.fromCharCode(...buf.subarray(i, i + CHUNK));
+  }
+  return `data:${ct};base64,${btoa(binary)}`;
+}
+
 app.get('/dashboard', async (c) => {
   const { workspaceId } = c.get('auth');
   const stats = await getDashboardStats(getDb(c.env.DB), workspaceId);
@@ -90,12 +106,18 @@ app.get('/:id/preview', async (c) => {
     where: eq(s.clients.id, data.invoice.clientId),
   });
   if (!company || !client) return c.json({ error: 'Missing data' }, 400);
+  const [logoDataUrl, signatureDataUrl] = await Promise.all([
+    r2KeyToDataUrl(c.env.ASSETS, company.logoR2Key),
+    r2KeyToDataUrl(c.env.ASSETS, company.signatureR2Key),
+  ]);
   const html = renderInvoiceHtml({
     invoice: data.invoice,
     items: data.items,
     client,
     company,
     showDraftWatermark: data.invoice.status === 'draft',
+    logoDataUrl,
+    signatureDataUrl,
   });
   return c.html(html);
 });
@@ -119,12 +141,18 @@ app.post('/:id/pdf', async (c) => {
   });
   if (!company || !client) return c.json({ error: 'Missing data' }, 400);
 
+  const [logoDataUrl, signatureDataUrl] = await Promise.all([
+    r2KeyToDataUrl(c.env.ASSETS, company.logoR2Key),
+    r2KeyToDataUrl(c.env.ASSETS, company.signatureR2Key),
+  ]);
   const html = renderInvoiceHtml({
     invoice: data.invoice,
     items: data.items,
     client,
     company,
     showDraftWatermark: false,
+    logoDataUrl,
+    signatureDataUrl,
   });
 
   const pdfSvc = new PdfService(c.env.BROWSER as never);

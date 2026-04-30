@@ -1,6 +1,10 @@
 'use client';
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8787';
+const API_URL =
+  process.env.NEXT_PUBLIC_API_URL ??
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost'
+    ? 'https://api.flow.kodspot.co.in'
+    : 'http://localhost:8787');
 const TOKEN_KEY = 'kf_token';
 
 export function getToken(): string | null {

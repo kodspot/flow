@@ -18,21 +18,12 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   body {
     font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 10.5px;
-    color: #111827;
+    color: #1f2937;
     background: #fff;
     line-height: 1.45;
     padding: 12mm 14mm;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
-    color-adjust: exact;
-    text-rendering: geometricPrecision;
-    -webkit-font-smoothing: antialiased;
-  }
-  /* Greyscale print fallback — keeps hierarchy when colour is off. */
-  @media print and (monochrome) {
-    .party-title, table.items thead th, .summary-table tr.total td { background: #000 !important; color: #fff !important; }
-    .amount-words { border-left-color: #000 !important; }
-    .declaration-box { border-left-color: #000 !important; }
   }
 
   /* ---------- Header band ---------- */
@@ -94,17 +85,17 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   table.items tbody td:nth-child(6) { text-align: right; width: 100px; font-weight: 600; }
 
   /* ---------- Summary ---------- */
-  .summary-row { display: grid; grid-template-columns: 1fr 280px; gap: 14px; margin-top: 12px; margin-bottom: 12px; align-items: start; }
+  .summary-row { display: grid; grid-template-columns: 1fr 300px; gap: 14px; margin-top: 12px; margin-bottom: 12px; align-items: start; }
   .amount-words { font-size: 10.5px; color: #475569; background: #f8fafc; border-left: 3px solid #14b8a6; padding: 8px 10px; border-radius: 2px; }
   .amount-words .k { font-size: 8.5px; font-weight: 700; color: #0f2944; text-transform: uppercase; letter-spacing: 0.6px; display: block; margin-bottom: 2px; }
   .amount-words .v { font-style: italic; color: #1f2937; font-weight: 500; }
-  .summary-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; }
+  .summary-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; }
   .summary-table td { padding: 7px 12px; font-size: 10.5px; border-bottom: 1px solid #e2e8f0; }
-  .summary-table td:first-child { color: #475569; font-weight: 600; }
+  .summary-table td:first-child { color: #475569; font-weight: 600; width: 110px; white-space: nowrap; }
   .summary-table td:last-child { text-align: right; color: #0f172a; font-weight: 600; }
   .summary-table tr:last-child td { border-bottom: none; }
-  .summary-table tr.total td { background: #0f2944; color: #fff; font-size: 14px; font-weight: 800; padding: 10px 14px; letter-spacing: 0.3px; white-space: nowrap; }
-  .summary-table tr.total td:first-child { color: #cbd5e1; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; font-weight: 700; width: 90px; }
+  .summary-table tr.total td { background: #0f2944; color: #fff; font-size: 14px; font-weight: 800; padding: 11px 12px; letter-spacing: 0.3px; }
+  .summary-table tr.total td:first-child { color: #ffffff; text-transform: uppercase; letter-spacing: 1.2px; font-size: 11px; font-weight: 700; }
 
   /* ---------- Compliance + payment ---------- */
   .declaration-box { border: 1px solid #e2e8f0; border-left: 3px solid #0f2944; background: #f8fafc; padding: 8px 12px; margin-bottom: 12px; border-radius: 2px; }
@@ -115,7 +106,7 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   .payment-grid .row { display: grid; grid-template-columns: 130px 1fr; gap: 8px; font-size: 10.5px; padding: 2px 0; }
   .payment-grid .row .k { color: #64748b; font-weight: 600; }
   .payment-grid .row .v { color: #0f172a; font-weight: 500; }
-  .payment-note { font-size: 10px; font-weight: 600; color: #b45309; margin-top: 6px; }
+  .payment-note { font-size: 10px; font-weight: 700; color: #0f2944; margin-top: 6px; padding-top: 6px; border-top: 1px dashed #cbd5e1; }
 
   /* ---------- Signatures ---------- */
   .signatures { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; margin-top: 18px; margin-bottom: 12px; page-break-inside: avoid; }
@@ -132,6 +123,20 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
 
   /* ---------- Watermark ---------- */
   .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-30deg); font-size: 110px; color: rgba(220, 38, 38, 0.07); font-weight: 900; letter-spacing: 14px; pointer-events: none; z-index: 0; }
+
+  /* ---------- Print / B&W safety ----------
+     Solid colors above translate cleanly to greyscale. We additionally force
+     full-fidelity colour rendering (so summary-table .total row stays dark
+     instead of getting dropped on "Background graphics off" Ctrl+P) and add
+     a media-print fallback that swaps the navy panels to solid black so the
+     invoice still reads strongly when printed on a black-and-white printer. */
+  @media print {
+    body { -webkit-print-color-adjust: exact !important; print-color-adjust: exact !important; }
+  }
+  /* Greyscale-printer fallback: when the colour chip renders flat, the cell
+     contents (white text on dark panel) still need to be readable. Boost the
+     navy to near-black for stronger greyscale conversion. */
+  .summary-table tr.total td, table.items thead th, .party-title { background: #0b2138 !important; }
 
   table.items tr, .signatures, .declaration-box, .summary-row, .payment-grid { page-break-inside: avoid; }
 </style>

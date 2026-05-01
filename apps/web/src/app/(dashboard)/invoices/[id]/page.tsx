@@ -61,6 +61,10 @@ export default function InvoiceDetailPage() {
 
   async function downloadPdf() {
     try {
+      // Always regenerate so the download reflects the latest template/data,
+      // not a stale cached R2 object from a prior render.
+      toast.message('Generating fresh PDF…');
+      await api(`/v1/invoices/${id}/pdf`, { method: 'POST' });
       const url = await fetchAssetBlobUrl(`/v1/invoices/${id}/pdf/download`);
       const a = document.createElement('a');
       a.href = url;
@@ -69,6 +73,7 @@ export default function InvoiceDetailPage() {
       a.click();
       a.remove();
       setTimeout(() => URL.revokeObjectURL(url), 5000);
+      qc.invalidateQueries({ queryKey: ['invoice', id] });
     } catch (e) {
       toast.error((e as Error).message);
     }

@@ -13,6 +13,7 @@ import {
   LogOut,
   Wallet,
   ChevronUp,
+  UserCircle,
 } from 'lucide-react';
 
 const NAV = [
@@ -22,6 +23,7 @@ const NAV = [
   { href: '/recurring', label: 'Recurring', icon: Repeat },
   { href: '/payments', label: 'Payments', icon: Wallet },
   { href: '/settings', label: 'Settings', icon: Settings },
+  { href: '/account', label: 'My account', icon: UserCircle },
 ] as const;
 
 interface MeResponse {
@@ -128,9 +130,16 @@ function ProfileMenu({
               {plan && <span className="ml-1 text-slate-400">({plan})</span>}
             </div>
           )}
+          <Link
+            href="/account"
+            onClick={() => setOpen(false)}
+            className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200"
+          >
+            Account & security
+          </Link>
           <button
             onClick={onSignOut}
-            className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-md bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
+            className="mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-md bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
           >
             <LogOut className="size-3.5" /> Sign out
           </button>

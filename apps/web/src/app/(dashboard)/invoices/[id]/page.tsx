@@ -1,23 +1,39 @@
 'use client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams } from 'next/navigation';
-import { api } from '@/lib/api';
+import { useEffect, useState } from 'react';
+import { api, fetchAssetBlobUrl } from '@/lib/api';
 import { formatINRCompact } from '@kodspot/shared/money';
 import { toast } from 'sonner';
 import { Download, FileCheck, Eye } from 'lucide-react';
 
-const API = process.env.NEXT_PUBLIC_API_URL ?? 'http://localhost:8787';
+interface InvoiceItem {
+  id: string;
+  description: string;
+  period: string | null;
+  rateLabel: string | null;
+  days: number | null;
+  amountPaise: number;
+}
+interface Invoice {
+  invoiceNumber: string;
+  invoiceDate: number;
+  status: string;
+  subtotalPaise: number;
+  totalPaise: number;
+  pdfR2Key: string | null;
+}
 
 export default function InvoiceDetailPage() {
   const { id } = useParams<{ id: string }>();
   const qc = useQueryClient();
   const { data, isLoading } = useQuery({
     queryKey: ['invoice', id],
-    queryFn: () => api<{ invoice: any; items: any[] }>(`/v1/invoices/${id}`),
+    queryFn: () => api<{ invoice: Invoice; items: InvoiceItem[] }>(`/v1/invoices/${id}`),
   });
 
   const generatePdf = useMutation({
-    mutationFn: () => api<{ pdfKey: string; downloadUrl: string }>(`/v1/invoices/${id}/pdf`, { method: 'POST' }),
+    mutationFn: () => api<{ pdfKey: string }>(`/v1/invoices/${id}/pdf`, { method: 'POST' }),
     onSuccess: () => { toast.success('PDF generated'); qc.invalidateQueries({ queryKey: ['invoice', id] }); },
     onError: (e) => toast.error((e as Error).message),
   });
@@ -26,6 +42,39 @@ export default function InvoiceDetailPage() {
     mutationFn: () => api(`/v1/invoices/${id}/status`, { method: 'PATCH', body: JSON.stringify({ status: 'paid' }) }),
     onSuccess: () => { toast.success('Marked paid'); qc.invalidateQueries({ queryKey: ['invoice', id] }); },
   });
+
+  const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
+  const [previewBusy, setPreviewBusy] = useState(false);
+
+  async function openPreview() {
+    setPreviewBusy(true);
+    try {
+      const url = await fetchAssetBlobUrl(`/v1/invoices/${id}/preview`);
+      setPreviewBlobUrl(url);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (e) {
+      toast.error((e as Error).message);
+    } finally {
+      setPreviewBusy(false);
+    }
+  }
+
+  async function downloadPdf() {
+    try {
+      const url = await fetchAssetBlobUrl(`/v1/invoices/${id}/pdf/download`);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `${data?.invoice.invoiceNumber.replace(/\//g, '-') ?? 'invoice'}.pdf`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 5000);
+    } catch (e) {
+      toast.error((e as Error).message);
+    }
+  }
+
+  useEffect(() => () => { if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl); }, [previewBlobUrl]);
 
   if (isLoading || !data) return <div>Loading…</div>;
   const { invoice, items } = data;
@@ -40,14 +89,13 @@ export default function InvoiceDetailPage() {
           </p>
         </div>
         <div className="flex gap-2">
-          <a
-            href={`${API}/v1/invoices/${id}/preview`}
-            target="_blank"
-            rel="noreferrer"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-semibold"
+          <button
+            onClick={openPreview}
+            disabled={previewBusy}
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-semibold disabled:opacity-50"
           >
-            <Eye className="size-4" /> Preview HTML
-          </a>
+            <Eye className="size-4" /> {previewBusy ? 'Opening…' : 'Preview HTML'}
+          </button>
           <button
             onClick={() => generatePdf.mutate()}
             disabled={generatePdf.isPending}
@@ -56,14 +104,12 @@ export default function InvoiceDetailPage() {
             <Download className="size-4" /> {generatePdf.isPending ? 'Generating…' : 'Generate PDF'}
           </button>
           {invoice.pdfR2Key && (
-            <a
-              href={`${API}/v1/invoices/${id}/pdf/download`}
-              target="_blank"
-              rel="noreferrer"
+            <button
+              onClick={downloadPdf}
               className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold"
             >
               <Download className="size-4" /> Download PDF
-            </a>
+            </button>
           )}
           {invoice.status !== 'paid' && (
             <button onClick={() => markPaid.mutate()} className="inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-semibold">

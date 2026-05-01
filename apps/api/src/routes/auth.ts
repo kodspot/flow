@@ -5,6 +5,7 @@ import { signupSchema, loginSchema } from '@kodspot/shared/schemas';
 import { getDb } from '../db/client.js';
 import * as s from '../db/schema.js';
 import { hashPassword, verifyPassword, signJwt } from '../lib/auth.js';
+import { authMiddleware } from '../middleware/auth.js';
 import type { Env, AppVariables } from '../env.js';
 
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
@@ -90,5 +91,24 @@ app.post('/login', async (c) => {
 });
 
 app.post('/logout', (c) => c.json({ ok: true }));
+
+/** Returns the current user + workspace from the JWT. */
+app.get('/me', authMiddleware, async (c) => {
+  const { userId, workspaceId } = c.get('auth');
+  const db = getDb(c.env.DB);
+  const user = await db.query.users.findFirst({ where: eq(s.users.id, userId) });
+  const workspace = await db.query.workspaces.findFirst({ where: eq(s.workspaces.id, workspaceId) });
+  if (!user || !workspace) return c.json({ error: 'Not found' }, 404);
+  return c.json({
+    user: {
+      id: user.id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      lastLoginAt: user.lastLoginAt,
+    },
+    workspace: { id: workspace.id, name: workspace.name, plan: workspace.plan },
+  });
+});
 
 export { app as authRoutes };

@@ -18,12 +18,21 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   body {
     font-family: 'Inter', 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
     font-size: 10.5px;
-    color: #1f2937;
+    color: #111827;
     background: #fff;
     line-height: 1.45;
     padding: 12mm 14mm;
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
+    color-adjust: exact;
+    text-rendering: geometricPrecision;
+    -webkit-font-smoothing: antialiased;
+  }
+  /* Greyscale print fallback — keeps hierarchy when colour is off. */
+  @media print and (monochrome) {
+    .party-title, table.items thead th, .summary-table tr.total td { background: #000 !important; color: #fff !important; }
+    .amount-words { border-left-color: #000 !important; }
+    .declaration-box { border-left-color: #000 !important; }
   }
 
   /* ---------- Header band ---------- */
@@ -94,8 +103,8 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   .summary-table td:first-child { color: #475569; font-weight: 600; }
   .summary-table td:last-child { text-align: right; color: #0f172a; font-weight: 600; }
   .summary-table tr:last-child td { border-bottom: none; }
-  .summary-table tr.total td { background: #0f2944; color: #fff; font-size: 13px; font-weight: 800; padding: 10px 12px; letter-spacing: 0.3px; }
-  .summary-table tr.total td:first-child { color: #93c5fd; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; font-weight: 700; }
+  .summary-table tr.total td { background: #0f2944; color: #fff; font-size: 14px; font-weight: 800; padding: 10px 14px; letter-spacing: 0.3px; white-space: nowrap; }
+  .summary-table tr.total td:first-child { color: #cbd5e1; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; font-weight: 700; width: 90px; }
 
   /* ---------- Compliance + payment ---------- */
   .declaration-box { border: 1px solid #e2e8f0; border-left: 3px solid #0f2944; background: #f8fafc; padding: 8px 12px; margin-bottom: 12px; border-radius: 2px; }
@@ -218,7 +227,7 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   <table class="summary-table">
     <tr><td>Subtotal</td><td>{{subtotalFormatted}}</td></tr>
     <tr><td>GST</td><td>{{gstDisplay}}</td></tr>
-    <tr class="total"><td>Total Due</td><td>{{totalFormatted}}</td></tr>
+    <tr class="total"><td>Total</td><td>{{totalFormatted}}</td></tr>
   </table>
 </div>
 

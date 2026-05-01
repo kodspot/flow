@@ -1,0 +1,8 @@
+User-agent: *
+Allow: /
+Disallow: /dashboard
+Disallow: /invoices
+Disallow: /clients
+Disallow: /settings
+
+Sitemap: https://flow.kodspot.co.in/sitemap.xml

@@ -50,7 +50,7 @@ export function renderInvoiceHtml(args: RenderInvoiceArgs): string {
 
   const gstDisplay = invoice.gstApplicable
     ? formatINRCompact(invoice.gstAmountPaise) + ` (${(invoice.gstRatePercent / 100).toFixed(0)}%)`
-    : 'Exempt (MSME)';
+    : 'Not Applicable (Micro Enterprise)';
 
   const ctx: Record<string, unknown> = {
     showDraftWatermark: args.showDraftWatermark ?? false,

@@ -9,16 +9,18 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Invoice - {{invoiceNumber}}</title>
 <style>
-@page { size: A4; margin: 15mm 20mm; }
+@page { size: A4; margin: 0; }
 * { margin: 0; padding: 0; box-sizing: border-box; }
-body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 12px; color: #333; background: #fff; line-height: 1.5; padding: 40px 60px; max-width: 210mm; margin: 0 auto; }
+html, body { width: 210mm; }
+body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; font-size: 11px; color: #333; background: #fff; line-height: 1.5; padding: 18mm 16mm; -webkit-print-color-adjust: exact; print-color-adjust: exact; }
 .header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
 .logo-section { display: flex; align-items: center; gap: 12px; }
-.logo-icon { width: 48px; height: 48px; }
+.logo-icon { width: 48px; height: 48px; object-fit: contain; }
+.logo-icon-lg { height: 64px; width: auto; max-width: 240px; object-fit: contain; }
 .logo-text { display: flex; flex-direction: column; }
-.logo-text .brand { font-size: 24px; font-weight: 700; color: #1a365d; letter-spacing: -0.5px; line-height: 1.2; }
+.logo-text .brand { font-size: 22px; font-weight: 700; color: #1a365d; letter-spacing: -0.5px; line-height: 1.2; }
 .logo-text .tagline { font-size: 9px; color: #666; letter-spacing: 0.5px; text-transform: uppercase; }
-.invoice-title { text-align: center; font-size: 28px; font-weight: 700; color: #1a365d; letter-spacing: 3px; margin-bottom: 20px; }
+.invoice-title { text-align: center; font-size: 26px; font-weight: 700; color: #1a365d; letter-spacing: 3px; margin-bottom: 16px; margin-top: 4px; }
 .invoice-meta { display: flex; justify-content: space-between; margin-bottom: 10px; }
 .invoice-meta .left, .invoice-meta .right { font-size: 11px; }
 .invoice-meta .label { font-weight: 600; color: #1a365d; }
@@ -69,10 +71,12 @@ table tbody td:nth-child(6) { text-align: right; width: 90px; }
 <div class="header">
   <div class="logo-section">
     {{{logoSvg}}}
+    {{#if showBrandText}}
     <div class="logo-text">
       <span class="brand">{{company.brandName}}</span>
       {{#if company.tagline}}<span class="tagline">{{company.tagline}}</span>{{/if}}
     </div>
+    {{/if}}
   </div>
 </div>
 

@@ -23,6 +23,10 @@ function joinNonEmpty(parts: Array<string | null | undefined>, sep = ', '): stri
   return parts.filter((p): p is string => !!p && p.trim().length > 0).join(sep);
 }
 
+function escapeAttr(value: string): string {
+  return value.replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+}
+
 export function renderInvoiceHtml(args: RenderInvoiceArgs): string {
   const { invoice, items, client, company } = args;
 
@@ -50,9 +54,13 @@ export function renderInvoiceHtml(args: RenderInvoiceArgs): string {
 
   const ctx: Record<string, unknown> = {
     showDraftWatermark: args.showDraftWatermark ?? false,
+    // When the user uploads a custom logo, render it larger and hide the
+    // textual wordmark — most uploaded brand logos already include the name.
+    // The default Kodspot SVG is a small mark and pairs with the wordmark.
     logoSvg: args.logoDataUrl
-      ? `<img class="logo-icon" src="${args.logoDataUrl}" alt="logo" />`
+      ? `<img class="logo-icon-lg" src="${args.logoDataUrl}" alt="${escapeAttr(company.brandName)}" />`
       : KODSPOT_DEFAULT_LOGO_SVG,
+    showBrandText: !args.logoDataUrl,
     invoiceNumber: invoice.invoiceNumber,
     invoiceDateFormatted: fmtDate(invoice.invoiceDate),
     dueDateFormatted: fmtDate(invoice.dueDate ?? undefined),

@@ -1,6 +1,7 @@
 /**
- * Tiny safe template engine — replaces {{key}} and {{#each items}}…{{/each}}
- * No eval. HTML-escapes all interpolated values.
+ * Tiny safe template engine — replaces {{key}}, {{#if x}}…{{/if}} (with nesting),
+ * and {{#each items}}…{{/each}} (with nesting). HTML-escapes all interpolated
+ * values. No eval.
  */
 
 function escapeHtml(value: unknown): string {
@@ -20,31 +21,49 @@ function getPath(ctx: Record<string, unknown>, path: string): unknown {
   }, ctx);
 }
 
-export function renderTemplate(template: string, ctx: Record<string, unknown>): string {
-  // {{#each items}}...{{/each}}
-  let out = template.replace(
-    /\{\{#each\s+([\w.]+)\}\}([\s\S]*?)\{\{\/each\}\}/g,
-    (_m, listKey: string, body: string) => {
+/**
+ * Replace innermost block-helper instances first ({{#each}} / {{#if}}) so
+ * that nested blocks render correctly. We iterate until no innermost block
+ * (i.e. one whose body contains no further opening tag) remains.
+ */
+function replaceBlocks(input: string, ctx: Record<string, unknown>): string {
+  let prev: string;
+  let out = input;
+  // Innermost {{#each ...}}…{{/each}} — body must not contain another {{#each
+  const eachRe =
+    /\{\{#each\s+([\w.]+)\}\}((?:(?!\{\{#each\s)[\s\S])*?)\{\{\/each\}\}/;
+  // Innermost {{#if ...}}…[{{else}}…]{{/if}} — body must not contain another {{#if
+  const ifRe =
+    /\{\{#if\s+([\w.]+)\}\}((?:(?!\{\{#if\s)[\s\S])*?)(?:\{\{else\}\}((?:(?!\{\{#if\s)[\s\S])*?))?\{\{\/if\}\}/;
+  do {
+    prev = out;
+    out = out.replace(eachRe, (_m, listKey: string, body: string) => {
       const list = getPath(ctx, listKey);
       if (!Array.isArray(list)) return '';
       return list
         .map((item, idx) =>
-          renderTemplate(body, { ...ctx, this: item, '@index': idx, '@number': idx + 1, ...item }),
+          renderTemplate(body, {
+            ...ctx,
+            this: item,
+            '@index': idx,
+            '@number': idx + 1,
+            ...item,
+          }),
         )
         .join('');
-    },
-  );
-
-  // {{#if key}}...{{/if}}
-  out = out.replace(
-    /\{\{#if\s+([\w.]+)\}\}([\s\S]*?)(?:\{\{else\}\}([\s\S]*?))?\{\{\/if\}\}/g,
-    (_m, key: string, truthy: string, falsy = '') => {
+    });
+    out = out.replace(ifRe, (_m, key: string, truthy: string, falsy = '') => {
       const v = getPath(ctx, key);
       return v ? truthy : falsy;
-    },
-  );
+    });
+  } while (out !== prev);
+  return out;
+}
 
-  // {{{raw}}}  — unescaped (use sparingly, only for trusted SVG/logo)
+export function renderTemplate(template: string, ctx: Record<string, unknown>): string {
+  let out = replaceBlocks(template, ctx);
+
+  // {{{raw}}} — unescaped (used for trusted SVG/logo only)
   out = out.replace(/\{\{\{([\w.]+)\}\}\}/g, (_m, key: string) => {
     const v = getPath(ctx, key);
     return v == null ? '' : String(v);

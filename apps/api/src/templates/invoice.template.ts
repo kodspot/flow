@@ -105,6 +105,7 @@ table tbody td:nth-child(6) { text-align: right; width: 90px; }
     <div class="party-title">From:</div>
     <p>{{company.brandName}}</p>
     {{#if company.addressLine1}}<p>{{company.addressLine1}}</p>{{/if}}
+    {{#if company.addressLine2}}<p>{{company.addressLine2}}</p>{{/if}}
     {{#if company.cityLine}}<p>{{company.cityLine}}</p>{{/if}}
     {{#if company.email}}<p>Email: {{company.email}}</p>{{/if}}
     {{#if company.phone}}<p>Phone: {{company.phone}}</p>{{/if}}

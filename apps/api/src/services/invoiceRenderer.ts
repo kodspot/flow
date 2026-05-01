@@ -84,6 +84,7 @@ export function renderInvoiceHtml(args: RenderInvoiceArgs): string {
       brandName: company.brandName,
       tagline: company.tagline ?? '',
       addressLine1: company.addressLine1 ?? '',
+      addressLine2: company.addressLine2 ?? '',
       cityLine: companyCity,
       email: company.email ?? '',
       phone: company.phone ?? '',

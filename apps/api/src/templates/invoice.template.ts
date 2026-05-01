@@ -85,17 +85,17 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   table.items tbody td:nth-child(6) { text-align: right; width: 100px; font-weight: 600; }
 
   /* ---------- Summary ---------- */
-  .summary-row { display: grid; grid-template-columns: 1fr 280px; gap: 14px; margin-top: 12px; margin-bottom: 12px; align-items: start; }
-  .amount-words { font-size: 10.5px; color: #475569; background: #f8fafc; border-left: 3px solid #14b8a6; padding: 8px 10px; border-radius: 2px; }
+  .summary-row { display: grid; grid-template-columns: 1fr 320px; gap: 14px; margin-top: 12px; margin-bottom: 12px; align-items: start; }
+  .amount-words { font-size: 10.5px; color: #475569; background: #f8fafc; border-left: 3px solid #0f2944; padding: 8px 10px; border-radius: 2px; }
   .amount-words .k { font-size: 8.5px; font-weight: 700; color: #0f2944; text-transform: uppercase; letter-spacing: 0.6px; display: block; margin-bottom: 2px; }
   .amount-words .v { font-style: italic; color: #1f2937; font-weight: 500; }
-  .summary-table { width: 100%; border-collapse: collapse; border: 1px solid #e2e8f0; border-radius: 4px; overflow: hidden; }
+  .summary-table { width: 100%; border-collapse: collapse; border: 1px solid #cbd5e1; border-radius: 4px; overflow: hidden; table-layout: fixed; }
   .summary-table td { padding: 7px 12px; font-size: 10.5px; border-bottom: 1px solid #e2e8f0; }
-  .summary-table td:first-child { color: #475569; font-weight: 600; }
-  .summary-table td:last-child { text-align: right; color: #0f172a; font-weight: 600; }
+  .summary-table td:first-child { color: #475569; font-weight: 600; width: 110px; white-space: nowrap; }
+  .summary-table td:last-child { text-align: right; color: #0f172a; font-weight: 600; white-space: nowrap; }
   .summary-table tr:last-child td { border-bottom: none; }
-  .summary-table tr.total td { background: #0f2944; color: #fff; font-size: 13px; font-weight: 800; padding: 10px 12px; letter-spacing: 0.3px; }
-  .summary-table tr.total td:first-child { color: #93c5fd; text-transform: uppercase; letter-spacing: 1px; font-size: 10px; font-weight: 700; }
+  .summary-table tr.total td { background: #0f2944; color: #fff; font-size: 14px; font-weight: 800; padding: 11px 12px; letter-spacing: 0.3px; white-space: nowrap; }
+  .summary-table tr.total td:first-child { color: #cbd5e1; text-transform: uppercase; letter-spacing: 1.5px; font-size: 11px; font-weight: 700; }
 
   /* ---------- Compliance + payment ---------- */
   .declaration-box { border: 1px solid #e2e8f0; border-left: 3px solid #0f2944; background: #f8fafc; padding: 8px 12px; margin-bottom: 12px; border-radius: 2px; }
@@ -218,7 +218,7 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   <table class="summary-table">
     <tr><td>Subtotal</td><td>{{subtotalFormatted}}</td></tr>
     <tr><td>GST</td><td>{{gstDisplay}}</td></tr>
-    <tr class="total"><td>Total Due</td><td>{{totalFormatted}}</td></tr>
+    <tr class="total"><td>Total</td><td>{{totalFormatted}}</td></tr>
   </table>
 </div>
 

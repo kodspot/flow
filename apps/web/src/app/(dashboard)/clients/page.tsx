@@ -32,36 +32,59 @@ export default function ClientsPage() {
         </button>
       </div>
 
-      <div className="bg-white border rounded-xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-slate-600 text-xs uppercase">
-            <tr>
-              <th className="px-4 py-3 text-left">Name</th>
-              <th className="px-4 py-3 text-left">Company</th>
-              <th className="px-4 py-3 text-left">Email</th>
-              <th className="px-4 py-3 text-left">City</th>
-              <th className="px-4 py-3 text-right">Actions</th>
-            </tr>
-          </thead>
-          <tbody>
-            {data?.clients.map((c) => (
-              <tr key={c.id} className="border-t">
-                <td className="px-4 py-3 font-medium">{c.name}</td>
-                <td className="px-4 py-3 text-slate-600">{c.company ?? '—'}</td>
-                <td className="px-4 py-3 text-slate-600">{c.email ?? '—'}</td>
-                <td className="px-4 py-3 text-slate-600">{c.city ?? '—'}</td>
-                <td className="px-4 py-3 text-right">
-                  <button onClick={() => del.mutate(c.id)} className="text-rose-600 hover:text-rose-700 p-1">
-                    <Trash2 className="size-4" />
-                  </button>
-                </td>
+      {/* Mobile cards */}
+      <div className="sm:hidden space-y-3">
+        {data?.clients.length === 0 && (
+          <div className="text-center text-slate-400 py-12">No clients yet</div>
+        )}
+        {data?.clients.map((c) => (
+          <div key={c.id} className="bg-white border rounded-xl p-4 flex items-start justify-between gap-3">
+            <div className="min-w-0">
+              <div className="font-semibold text-sm truncate">{c.name}</div>
+              {c.company && <div className="text-xs text-slate-500 truncate">{c.company}</div>}
+              {c.email && <div className="text-xs text-slate-400 truncate mt-0.5">{c.email}</div>}
+              {c.city && <div className="text-xs text-slate-400">{c.city}{c.state ? `, ${c.state}` : ''}</div>}
+            </div>
+            <button onClick={() => del.mutate(c.id)} className="shrink-0 text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50">
+              <Trash2 className="size-4" />
+            </button>
+          </div>
+        ))}
+      </div>
+
+      {/* Desktop table */}
+      <div className="hidden sm:block bg-white border rounded-xl overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm">
+            <thead className="bg-slate-50 text-slate-600 text-xs uppercase">
+              <tr>
+                <th className="px-4 py-3 text-left">Name</th>
+                <th className="px-4 py-3 text-left">Company</th>
+                <th className="px-4 py-3 text-left">Email</th>
+                <th className="px-4 py-3 text-left">City</th>
+                <th className="px-4 py-3 text-right">Actions</th>
               </tr>
-            ))}
-            {data?.clients.length === 0 && (
-              <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-400">No clients yet</td></tr>
-            )}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {data?.clients.map((c) => (
+                <tr key={c.id} className="border-t">
+                  <td className="px-4 py-3 font-medium">{c.name}</td>
+                  <td className="px-4 py-3 text-slate-600">{c.company ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{c.email ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-600">{c.city ?? '—'}</td>
+                  <td className="px-4 py-3 text-right">
+                    <button onClick={() => del.mutate(c.id)} className="text-rose-600 hover:text-rose-700 p-1">
+                      <Trash2 className="size-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+              {data?.clients.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-12 text-center text-slate-400">No clients yet</td></tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       {open && <ClientForm onClose={() => setOpen(false)} />}

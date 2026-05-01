@@ -48,8 +48,8 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-6 bg-slate-50">
-        <div className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border space-y-3 text-center">
+      <main className="min-h-screen flex items-center justify-center px-4 bg-slate-50">
+        <div className="w-full max-w-sm bg-white p-6 sm:p-8 rounded-xl shadow-sm border space-y-3 text-center">
           <h1 className="text-xl font-bold text-kodspot">Invalid link</h1>
           <p className="text-sm text-slate-500">
             This reset link is missing a token. Please request a new one.
@@ -66,8 +66,8 @@ function ResetPasswordForm() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 bg-slate-50">
-      <form onSubmit={onSubmit} className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border space-y-5">
+    <main className="min-h-screen flex items-center justify-center px-4 bg-slate-50">
+      <form onSubmit={onSubmit} className="w-full max-w-sm bg-white p-6 sm:p-8 rounded-xl shadow-sm border space-y-5">
         <div>
           <h1 className="text-2xl font-bold text-kodspot">Reset password</h1>
           <p className="text-sm text-slate-500 mt-1">Choose a strong new password.</p>

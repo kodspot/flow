@@ -90,14 +90,14 @@ export default function NewInvoicePage() {
       onSubmit={(e) => { e.preventDefault(); if (!clientId) return toast.error('Select a client'); m.mutate(); }}
       className="space-y-6 max-w-5xl"
     >
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">New invoice</h1>
-        <button type="submit" disabled={m.isPending} className="px-5 py-2 rounded-md bg-kodspot text-white font-semibold disabled:opacity-50">
+      <div className="flex items-center justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold">New invoice</h1>
+        <button type="submit" disabled={m.isPending} className="shrink-0 px-4 py-2 rounded-md bg-kodspot text-white font-semibold disabled:opacity-50 text-sm">
           {m.isPending ? 'Creating…' : 'Create invoice'}
         </button>
       </div>
 
-      <div className="grid grid-cols-3 gap-4 bg-white border rounded-xl p-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-white border rounded-xl p-5">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Client *</label>
           <select required value={clientId} onChange={(e) => setClientId(e.target.value)} className="w-full px-3 py-2 border rounded-md text-sm">
@@ -126,21 +126,25 @@ export default function NewInvoicePage() {
         </div>
         <div className="space-y-3">
           {items.map((it, i) => (
-            <div key={i} className="grid grid-cols-12 gap-2 items-start">
-              <input placeholder="Description *" required value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} className="col-span-4 px-3 py-2 border rounded-md text-sm" />
-              <input placeholder="Period (e.g. 17 Apr – 30 Apr 2026)" value={it.period} onChange={(e) => setItem(i, { period: e.target.value })} className="col-span-3 px-3 py-2 border rounded-md text-sm" />
-              <input placeholder="Rate label (₹12,000/month)" value={it.rateLabel} onChange={(e) => setItem(i, { rateLabel: e.target.value })} className="col-span-2 px-3 py-2 border rounded-md text-sm" />
-              <input type="number" placeholder="Days" value={it.days} onChange={(e) => setItem(i, { days: e.target.value })} className="col-span-1 px-3 py-2 border rounded-md text-sm" />
-              <input type="number" step="0.01" placeholder="Amount ₹ *" required value={it.amountRupees} onChange={(e) => setItem(i, { amountRupees: e.target.value })} className="col-span-1 px-3 py-2 border rounded-md text-sm" />
-              <button type="button" onClick={() => setItems((p) => p.filter((_, idx) => idx !== i))} className="col-span-1 p-2 text-rose-600 hover:bg-rose-50 rounded">
-                <Trash2 className="size-4" />
-              </button>
+            <div key={i} className="flex flex-col gap-2 p-3 border rounded-lg bg-slate-50">
+              <div className="flex gap-2">
+                <input placeholder="Description *" required value={it.description} onChange={(e) => setItem(i, { description: e.target.value })} className="flex-1 px-3 py-2 border rounded-md text-sm bg-white" />
+                <button type="button" onClick={() => setItems((p) => p.filter((_, idx) => idx !== i))} className="shrink-0 p-2 text-rose-600 hover:bg-rose-100 rounded">
+                  <Trash2 className="size-4" />
+                </button>
+              </div>
+              <input placeholder="Period (e.g. 17 Apr – 30 Apr 2026)" value={it.period} onChange={(e) => setItem(i, { period: e.target.value })} className="w-full px-3 py-2 border rounded-md text-sm bg-white" />
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                <input placeholder="Rate label (e.g. ₹12k/mo)" value={it.rateLabel} onChange={(e) => setItem(i, { rateLabel: e.target.value })} className="col-span-2 sm:col-span-1 px-3 py-2 border rounded-md text-sm bg-white" />
+                <input type="number" placeholder="Days" value={it.days} onChange={(e) => setItem(i, { days: e.target.value })} className="px-3 py-2 border rounded-md text-sm bg-white" />
+                <input type="number" step="0.01" placeholder="Amount ₹ *" required value={it.amountRupees} onChange={(e) => setItem(i, { amountRupees: e.target.value })} className="px-3 py-2 border rounded-md text-sm bg-white" />
+              </div>
             </div>
           ))}
         </div>
 
         <div className="mt-5 flex justify-end">
-          <div className="w-72 space-y-1 text-sm">
+          <div className="w-full sm:w-72 space-y-1 text-sm">
             <div className="flex justify-between"><span>Subtotal</span><span>{formatINRCompact(rupeesToPaise(subtotal))}</span></div>
             <div className="flex justify-between items-center">
               <label className="flex items-center gap-2">

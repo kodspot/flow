@@ -14,6 +14,8 @@ import {
   Wallet,
   ChevronUp,
   UserCircle,
+  Menu,
+  X,
 } from 'lucide-react';
 
 const NAV = [
@@ -35,6 +37,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   const router = useRouter();
   const pathname = usePathname();
   const [authed, setAuthed] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
   useEffect(() => {
     if (!getToken()) {
@@ -43,6 +46,11 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       setAuthed(true);
     }
   }, [router]);
+
+  // Close drawer on route change (mobile navigation)
+  useEffect(() => {
+    setSidebarOpen(false);
+  }, [pathname]);
 
   const { data } = useQuery({
     queryKey: ['me'],
@@ -57,27 +65,86 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     if (data === undefined) return;
   }, [data]);
 
+  const sidebarContent = (
+    <>
+      <div className="p-5 border-b border-white/10">
+        <div className="text-xl font-bold tracking-tight">Kodspot Flow</div>
+        <div className="text-[10px] uppercase tracking-widest text-kodspot-mint mt-0.5">
+          Operations. Verified.
+        </div>
+      </div>
+      <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
+        {NAV.map(({ href, label, icon: Icon }) => {
+          const active = pathname === href || pathname.startsWith(href + '/');
+          return (
+            <Link
+              key={href}
+              href={href}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-md text-sm transition ${
+                active ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <Icon className="size-4 shrink-0" />
+              {label}
+            </Link>
+          );
+        })}
+      </nav>
+      <ProfileMenu
+        name={data?.user.name ?? 'Loading…'}
+        email={data?.user.email ?? ''}
+        workspaceName={data?.workspace.name ?? ''}
+        plan={data?.workspace.plan ?? ''}
+        onSignOut={() => { clearToken(); router.push('/login'); }}
+      />
+    </>
+  );
+
   return (
     <div className="min-h-screen flex bg-slate-50">
-      <aside className="w-60 bg-kodspot text-white flex flex-col">
-        <div className="p-5 border-b border-white/10">
-          <div className="text-xl font-bold tracking-tight">Kodspot Flow</div>
-          <div className="text-[10px] uppercase tracking-widest text-kodspot-mint mt-0.5">
-            Operations. Verified.
+      {/* Desktop sidebar */}
+      <aside className="hidden md:flex w-60 bg-kodspot text-white flex-col shrink-0">
+        {sidebarContent}
+      </aside>
+
+      {/* Mobile sidebar overlay */}
+      {sidebarOpen && (
+        <div
+          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          onClick={() => setSidebarOpen(false)}
+        />
+      )}
+      <aside
+        className={`fixed inset-y-0 left-0 z-50 w-72 bg-kodspot text-white flex flex-col transition-transform duration-200 md:hidden ${
+          sidebarOpen ? 'translate-x-0' : '-translate-x-full'
+        }`}
+      >
+        <div className="flex items-center justify-between p-4 border-b border-white/10">
+          <div>
+            <div className="text-lg font-bold tracking-tight">Kodspot Flow</div>
+            <div className="text-[10px] uppercase tracking-widest text-kodspot-mint mt-0.5">
+              Operations. Verified.
+            </div>
           </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="p-1.5 rounded-md hover:bg-white/10 text-white/70"
+          >
+            <X className="size-5" />
+          </button>
         </div>
-        <nav className="flex-1 p-3 space-y-1">
+        <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
           {NAV.map(({ href, label, icon: Icon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
             return (
               <Link
                 key={href}
                 href={href}
-                className={`flex items-center gap-3 px-3 py-2 rounded-md text-sm transition ${
+                className={`flex items-center gap-3 px-3 py-3 rounded-md text-sm transition ${
                   active ? 'bg-white/10 text-white' : 'text-white/70 hover:bg-white/5 hover:text-white'
                 }`}
               >
-                <Icon className="size-4" />
+                <Icon className="size-4 shrink-0" />
                 {label}
               </Link>
             );
@@ -91,7 +158,22 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           onSignOut={() => { clearToken(); router.push('/login'); }}
         />
       </aside>
-      <main className="flex-1 p-8 overflow-auto">{children}</main>
+
+      {/* Content area */}
+      <div className="flex-1 flex flex-col min-w-0">
+        {/* Mobile top header */}
+        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b sticky top-0 z-30">
+          <button
+            onClick={() => setSidebarOpen(true)}
+            className="p-1.5 rounded-md text-slate-600 hover:bg-slate-100"
+          >
+            <Menu className="size-5" />
+          </button>
+          <span className="font-bold text-kodspot">Kodspot Flow</span>
+        </header>
+
+        <main className="flex-1 p-4 md:p-8 overflow-auto">{children}</main>
+      </div>
     </div>
   );
 }

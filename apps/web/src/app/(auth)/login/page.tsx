@@ -30,8 +30,8 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 bg-slate-50">
-      <form onSubmit={onSubmit} className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border space-y-5">
+    <main className="min-h-screen flex items-center justify-center px-4 bg-slate-50">
+      <form onSubmit={onSubmit} className="w-full max-w-sm bg-white p-6 sm:p-8 rounded-xl shadow-sm border space-y-5">
         <div>
           <h1 className="text-2xl font-bold text-kodspot">Sign in</h1>
           <p className="text-sm text-slate-500 mt-1">Welcome back to Kodspot Flow</p>

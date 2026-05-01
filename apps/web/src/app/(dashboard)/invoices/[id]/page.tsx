@@ -86,46 +86,46 @@ export default function InvoiceDetailPage() {
 
   return (
     <div className="space-y-6 max-w-5xl">
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-bold font-mono text-kodspot">{invoice.invoiceNumber}</h1>
+          <h1 className="text-xl sm:text-2xl font-bold font-mono text-kodspot">{invoice.invoiceNumber}</h1>
           <p className="text-sm text-slate-500">
             {new Date(invoice.invoiceDate).toLocaleDateString('en-IN')} · Status: <b>{invoice.status}</b>
           </p>
         </div>
-        <div className="flex gap-2">
+        <div className="flex flex-wrap gap-2">
           <button
             onClick={openPreview}
             disabled={previewBusy}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-semibold disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-semibold disabled:opacity-50"
           >
             <Eye className="size-4" /> {previewBusy ? 'Opening…' : 'Preview HTML'}
           </button>
           <button
             onClick={() => generatePdf.mutate()}
             disabled={generatePdf.isPending}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-kodspot text-white text-sm font-semibold disabled:opacity-50"
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-kodspot text-white text-sm font-semibold disabled:opacity-50"
           >
             <Download className="size-4" /> {generatePdf.isPending ? 'Generating…' : 'Generate PDF'}
           </button>
           {invoice.pdfR2Key && (
             <button
               onClick={downloadPdf}
-              className="inline-flex items-center gap-2 px-4 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold"
+              className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-emerald-600 text-white text-sm font-semibold"
             >
               <Download className="size-4" /> Download PDF
             </button>
           )}
           {invoice.status !== 'paid' && (
-            <button onClick={() => markPaid.mutate()} className="inline-flex items-center gap-2 px-4 py-2 rounded-md border text-sm font-semibold">
+            <button onClick={() => markPaid.mutate()} className="inline-flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-semibold">
               <FileCheck className="size-4" /> Mark paid
             </button>
           )}
         </div>
       </div>
 
-      <div className="bg-white border rounded-xl p-6">
-        <div className="grid grid-cols-2 gap-6 mb-6">
+      <div className="bg-white border rounded-xl p-4 sm:p-6">
+        <div className="grid grid-cols-2 gap-4 mb-6">
           <div>
             <div className="text-xs uppercase text-slate-500">Subtotal</div>
             <div className="text-xl font-bold">{formatINRCompact(invoice.subtotalPaise)}</div>
@@ -135,22 +135,24 @@ export default function InvoiceDetailPage() {
             <div className="text-xl font-bold text-kodspot">{formatINRCompact(invoice.totalPaise)}</div>
           </div>
         </div>
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 text-xs uppercase">
-            <tr><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2">Period</th><th className="px-3 py-2">Rate</th><th className="px-3 py-2">Days</th><th className="px-3 py-2 text-right">Amount</th></tr>
-          </thead>
-          <tbody>
-            {items.map((it) => (
-              <tr key={it.id} className="border-t">
-                <td className="px-3 py-2">{it.description}</td>
-                <td className="px-3 py-2 text-center">{it.period ?? '—'}</td>
-                <td className="px-3 py-2 text-center">{it.rateLabel ?? '—'}</td>
-                <td className="px-3 py-2 text-center">{it.days ?? '—'}</td>
-                <td className="px-3 py-2 text-right">{formatINRCompact(it.amountPaise)}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+        <div className="overflow-x-auto">
+          <table className="w-full text-sm min-w-[480px]">
+            <thead className="bg-slate-50 text-xs uppercase">
+              <tr><th className="px-3 py-2 text-left">Description</th><th className="px-3 py-2">Period</th><th className="px-3 py-2">Rate</th><th className="px-3 py-2">Days</th><th className="px-3 py-2 text-right">Amount</th></tr>
+            </thead>
+            <tbody>
+              {items.map((it) => (
+                <tr key={it.id} className="border-t">
+                  <td className="px-3 py-2">{it.description}</td>
+                  <td className="px-3 py-2 text-center">{it.period ?? '—'}</td>
+                  <td className="px-3 py-2 text-center">{it.rateLabel ?? '—'}</td>
+                  <td className="px-3 py-2 text-center">{it.days ?? '—'}</td>
+                  <td className="px-3 py-2 text-right">{formatINRCompact(it.amountPaise)}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     </div>
   );

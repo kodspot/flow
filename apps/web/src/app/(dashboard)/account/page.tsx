@@ -184,7 +184,7 @@ export default function AccountPage() {
           <ShieldCheck className="size-5 text-kodspot" />
           <h2 className="font-semibold text-slate-800">Security</h2>
         </header>
-        <dl className="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-2 text-sm">
+        <dl className="grid grid-cols-1 gap-y-3 text-sm">
           <dt className="text-slate-500">Last sign-in</dt>
           <dd className="text-slate-800">
             {data.user.lastLoginAt

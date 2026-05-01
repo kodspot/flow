@@ -134,14 +134,14 @@ export default function SettingsPage() {
 
   return (
     <form onSubmit={(e) => { e.preventDefault(); save.mutate(); }} className="space-y-6 max-w-4xl">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">Company settings</h1>
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <h1 className="text-xl sm:text-2xl font-bold">Company settings</h1>
         <div className="flex gap-2">
           <button
             type="button"
             onClick={() => seed.mutate()}
             disabled={seed.isPending}
-            className="px-4 py-2 rounded-md border border-slate-300 text-sm font-medium disabled:opacity-50"
+            className="px-3 py-2 rounded-md border border-slate-300 text-sm font-medium disabled:opacity-50"
             title="Fill blank fields with verified KODSPOT defaults"
           >
             {seed.isPending ? 'Filling…' : 'Use KODSPOT defaults'}
@@ -149,7 +149,7 @@ export default function SettingsPage() {
           <button
             type="submit"
             disabled={save.isPending}
-            className="px-5 py-2 rounded-md bg-kodspot text-white font-semibold disabled:opacity-50"
+            className="px-4 py-2 rounded-md bg-kodspot text-white font-semibold disabled:opacity-50"
           >
             {save.isPending ? 'Saving…' : 'Save'}
           </button>
@@ -164,7 +164,7 @@ export default function SettingsPage() {
       {GROUPS.map((group) => (
         <fieldset key={group.title} className="bg-white border rounded-xl p-6">
           <legend className="px-2 text-sm font-semibold text-slate-700">{group.title}</legend>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {group.fields.map(({ key, label, type }) => (
               <div key={String(key)} className={type === 'textarea' ? 'col-span-2' : ''}>
                 <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
@@ -201,7 +201,7 @@ export default function SettingsPage() {
 
 function BrandingPanel({ logoKey, signatureKey }: { logoKey: string | null; signatureKey: string | null }) {
   return (
-    <div className="bg-white border rounded-xl p-6 grid grid-cols-2 gap-6">
+    <div className="bg-white border rounded-xl p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
       <AssetUploader kind="logo" label="Logo" assetKey={logoKey} hint="PNG/SVG, square recommended, max 2 MB" />
       <AssetUploader kind="signature" label="Signature" assetKey={signatureKey} hint="Transparent PNG preferred, max 2 MB" />
     </div>

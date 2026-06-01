@@ -59,8 +59,11 @@ app.post('/upload/:kind', async (c) => {
   if (!isAssetKind(kind)) return c.json({ error: 'Invalid kind' }, 400);
 
   const form = await c.req.formData().catch(() => null);
-  const file = form?.get('file');
-  if (!(file instanceof File)) return c.json({ error: 'No file uploaded' }, 400);
+  const fileEntry = form?.get('file');
+  if (!fileEntry || typeof fileEntry === 'string') {
+    return c.json({ error: 'No file uploaded' }, 400);
+  }
+  const file = fileEntry as unknown as { type: string; size: number; arrayBuffer: () => Promise<ArrayBuffer> };
   if (!ALLOWED_IMAGE_TYPES.has(file.type)) {
     return c.json({ error: `Unsupported file type: ${file.type}` }, 400);
   }

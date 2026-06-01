@@ -19,13 +19,13 @@ import {
 } from 'lucide-react';
 
 const NAV = [
-  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard },
-  { href: '/invoices', label: 'Invoices', icon: FileText },
-  { href: '/clients', label: 'Clients', icon: Users },
-  { href: '/recurring', label: 'Recurring', icon: Repeat },
-  { href: '/payments', label: 'Payments', icon: Wallet },
-  { href: '/settings', label: 'Settings', icon: Settings },
-  { href: '/account', label: 'My account', icon: UserCircle },
+  { href: '/dashboard', label: 'Dashboard', icon: LayoutDashboard, soon: false },
+  { href: '/invoices', label: 'Invoices', icon: FileText, soon: false },
+  { href: '/clients', label: 'Clients', icon: Users, soon: false },
+  { href: '/recurring', label: 'Recurring', icon: Repeat, soon: true },
+  { href: '/payments', label: 'Payments', icon: Wallet, soon: true },
+  { href: '/settings', label: 'Settings', icon: Settings, soon: false },
+  { href: '/account', label: 'My account', icon: UserCircle, soon: false },
 ] as const;
 
 interface MeResponse {
@@ -74,7 +74,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         </div>
       </div>
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {NAV.map(({ href, label, icon: Icon }) => {
+        {NAV.map(({ href, label, icon: Icon, soon }) => {
           const active = pathname === href || pathname.startsWith(href + '/');
           return (
             <Link
@@ -85,7 +85,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
               }`}
             >
               <Icon className="size-4 shrink-0" />
-              {label}
+              <span className="flex-1">{label}</span>
+              {soon && (
+                <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-kodspot-mint/20 text-kodspot-mint font-semibold">
+                  Soon
+                </span>
+              )}
             </Link>
           );
         })}
@@ -134,7 +139,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </button>
         </div>
         <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-          {NAV.map(({ href, label, icon: Icon }) => {
+          {NAV.map(({ href, label, icon: Icon, soon }) => {
             const active = pathname === href || pathname.startsWith(href + '/');
             return (
               <Link
@@ -145,7 +150,12 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
                 }`}
               >
                 <Icon className="size-4 shrink-0" />
-                {label}
+                <span className="flex-1">{label}</span>
+                {soon && (
+                  <span className="text-[9px] uppercase tracking-wider px-1.5 py-0.5 rounded bg-kodspot-mint/20 text-kodspot-mint font-semibold">
+                    Soon
+                  </span>
+                )}
               </Link>
             );
           })}

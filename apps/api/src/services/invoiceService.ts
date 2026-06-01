@@ -3,7 +3,7 @@ import { nanoid } from 'nanoid';
 import type { DB } from '../db/client.js';
 import * as s from '../db/schema.js';
 import { amountInWords } from '@kodspot/shared/money';
-import type { InvoiceCreateInput } from '@kodspot/shared/schemas';
+import type { InvoiceCreateInput, InvoiceUpdateInput } from '@kodspot/shared/schemas';
 import { formatInvoiceNumber } from './invoiceCounter.js';
 
 export interface CounterStub {
@@ -180,4 +180,138 @@ export async function getDashboardStats(db: DB, workspaceId: string) {
     stats.total.amount += Number(r.total);
   }
   return stats;
+}
+
+/**
+ * Update a draft invoice (full replace of fields + items).
+ * Throws if not found, not editable (non-draft), or client invalid.
+ * Returns the updated id.
+ */
+export async function updateInvoice(
+  db: DB,
+  workspaceId: string,
+  id: string,
+  input: InvoiceUpdateInput,
+): Promise<{ id: string }> {
+  const existing = await db.query.invoices.findFirst({
+    where: and(eq(s.invoices.id, id), eq(s.invoices.workspaceId, workspaceId), isNull(s.invoices.deletedAt)),
+  });
+  if (!existing) throw new Error('Invoice not found');
+  if (existing.status !== 'draft') {
+    throw new Error('Only draft invoices can be edited. Change status to draft first or duplicate this invoice.');
+  }
+
+  // Resolve client (may change)
+  const clientId = input.clientId ?? existing.clientId;
+  const client = await db.query.clients.findFirst({
+    where: and(
+      eq(s.clients.id, clientId),
+      eq(s.clients.workspaceId, workspaceId),
+      isNull(s.clients.deletedAt),
+    ),
+  });
+  if (!client) throw new Error('Client not found');
+
+  const items = input.items ?? [];
+  if (items.length === 0) throw new Error('At least one item required');
+
+  const subtotal = items.reduce((sum, it) => sum + it.amountPaise, 0);
+  const gstApplicable = input.gstApplicable ?? existing.gstApplicable;
+  const gstRatePercent = input.gstRatePercent ?? existing.gstRatePercent / 100;
+  const gstRateBp = gstApplicable ? Math.round(gstRatePercent * 100) : 0;
+  const gstAmount = gstApplicable ? Math.round((subtotal * gstRateBp) / 10000) : 0;
+  const total = subtotal + gstAmount;
+
+  const invoiceDateMs = input.invoiceDate ? toDateMs(input.invoiceDate) : existing.invoiceDate;
+  const dueDateMs =
+    input.dueDate === undefined
+      ? existing.dueDate
+      : input.dueDate === null
+      ? null
+      : toDateMs(input.dueDate);
+
+  const now = Date.now();
+
+  await db.batch([
+    db.update(s.invoices)
+      .set({
+        clientId: client.id,
+        clientSnapshot: JSON.stringify(client),
+        invoiceDate: invoiceDateMs,
+        dueDate: dueDateMs,
+        placeOfSupply: input.placeOfSupply ?? existing.placeOfSupply,
+        subtotalPaise: subtotal,
+        gstApplicable,
+        gstRatePercent: gstRateBp,
+        gstAmountPaise: gstAmount,
+        gstNote: input.gstNote ?? existing.gstNote,
+        totalPaise: total,
+        amountInWords: amountInWords(total),
+        notes: input.notes ?? existing.notes,
+        internalNotes: input.internalNotes ?? existing.internalNotes,
+        // Invalidate cached PDF — must be regenerated after edit
+        pdfR2Key: null,
+        htmlSnapshotR2Key: null,
+        updatedAt: now,
+      })
+      .where(and(eq(s.invoices.id, id), eq(s.invoices.workspaceId, workspaceId))),
+    db.delete(s.invoiceItems).where(eq(s.invoiceItems.invoiceId, id)),
+    ...items.map((it, idx) =>
+      db.insert(s.invoiceItems).values({
+        id: nanoid(16),
+        invoiceId: id,
+        workspaceId,
+        position: idx,
+        description: it.description,
+        period: it.period ?? null,
+        rateLabel: it.rateLabel ?? null,
+        ratePaise: it.ratePaise ?? null,
+        days: it.days ?? null,
+        quantity: it.quantity ?? 1,
+        amountPaise: it.amountPaise,
+        createdAt: now,
+      }),
+    ),
+    db.insert(s.auditLogs).values({
+      id: nanoid(16),
+      workspaceId,
+      actorUserId: null,
+      action: 'invoice.updated',
+      entityType: 'invoice',
+      entityId: id,
+      metadata: JSON.stringify({ total }),
+      createdAt: now,
+    }),
+  ] as const);
+
+  return { id };
+}
+
+/**
+ * Soft-delete a draft invoice. Non-draft invoices cannot be deleted (use cancel).
+ */
+export async function softDeleteInvoice(db: DB, workspaceId: string, id: string): Promise<void> {
+  const existing = await db.query.invoices.findFirst({
+    where: and(eq(s.invoices.id, id), eq(s.invoices.workspaceId, workspaceId), isNull(s.invoices.deletedAt)),
+  });
+  if (!existing) throw new Error('Invoice not found');
+  if (existing.status !== 'draft') {
+    throw new Error('Only draft invoices can be deleted. Cancel non-draft invoices instead.');
+  }
+  const now = Date.now();
+  await db.batch([
+    db.update(s.invoices)
+      .set({ deletedAt: now, updatedAt: now })
+      .where(and(eq(s.invoices.id, id), eq(s.invoices.workspaceId, workspaceId))),
+    db.insert(s.auditLogs).values({
+      id: nanoid(16),
+      workspaceId,
+      actorUserId: null,
+      action: 'invoice.deleted',
+      entityType: 'invoice',
+      entityId: id,
+      metadata: null,
+      createdAt: now,
+    }),
+  ] as const);
 }

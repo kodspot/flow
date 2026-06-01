@@ -1,6 +1,6 @@
 import { Hono } from 'hono';
 import { and, eq } from 'drizzle-orm';
-import { invoiceCreateSchema, invoiceStatusUpdateSchema } from '@kodspot/shared/schemas';
+import { invoiceCreateSchema, invoiceUpdateSchema, invoiceStatusUpdateSchema } from '@kodspot/shared/schemas';
 import { getDb } from '../db/client.js';
 import * as s from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
@@ -9,6 +9,8 @@ import {
   getInvoiceWithItems,
   listInvoices,
   getDashboardStats,
+  updateInvoice,
+  softDeleteInvoice,
 } from '../services/invoiceService.js';
 import { renderInvoiceHtml } from '../services/invoiceRenderer.js';
 import { PdfService } from '../services/pdfService.js';
@@ -89,6 +91,29 @@ app.patch('/:id/status', async (c) => {
     })
     .where(and(eq(s.invoices.id, c.req.param('id')), eq(s.invoices.workspaceId, workspaceId)));
   return c.json({ ok: true });
+});
+
+app.patch('/:id', async (c) => {
+  const { workspaceId } = c.get('auth');
+  const body = await c.req.json().catch(() => null);
+  const parsed = invoiceUpdateSchema.safeParse(body);
+  if (!parsed.success) return c.json({ error: 'Invalid input', issues: parsed.error.issues }, 400);
+  try {
+    const result = await updateInvoice(getDb(c.env.DB), workspaceId, c.req.param('id'), parsed.data);
+    return c.json(result);
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 400);
+  }
+});
+
+app.delete('/:id', async (c) => {
+  const { workspaceId } = c.get('auth');
+  try {
+    await softDeleteInvoice(getDb(c.env.DB), workspaceId, c.req.param('id'));
+    return c.json({ ok: true });
+  } catch (e) {
+    return c.json({ error: (e as Error).message }, 400);
+  }
 });
 
 /**

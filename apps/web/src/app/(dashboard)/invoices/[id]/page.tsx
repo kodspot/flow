@@ -5,7 +5,11 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, fetchAssetBlobUrl } from '@/lib/api';
 import { formatINRCompact } from '@kodspot/shared/money';
-import { isCustomInvoiceColumnKey, parseInvoiceInternalNotes } from '@kodspot/shared/invoiceTables';
+import {
+  INVOICE_RESERVED_ROW_VALUE_KEYS,
+  isCustomInvoiceColumnKey,
+  parseInvoiceInternalNotes,
+} from '@kodspot/shared/invoiceTables';
 import { toast } from 'sonner';
 import {
   Download,
@@ -133,15 +137,22 @@ export default function InvoiceDetailPage() {
   const isSentOrOverdue = invoice.status === 'sent' || invoice.status === 'overdue';
 
   function getCellValue(item: InvoiceItem, rowIndex: number, key: string): string {
+    const rowValues = tableMeta.customRowValues[rowIndex] ?? {};
     if (key === 'sno') return String(rowIndex + 1);
     if (key === 'description') return item.description;
     if (key === 'period') return item.period ?? '—';
     if (key === 'rateLabel') return item.rateLabel ?? '—';
-    if (key === 'days') return item.days != null ? String(item.days) : '—';
-    if (key === 'quantity') return String(item.quantity ?? 1);
+    if (key === 'days') {
+      return rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.daysDisplay] ||
+        (item.days != null ? String(item.days) : '—');
+    }
+    if (key === 'quantity') {
+      return rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.quantityDisplay] ||
+        String(item.quantity ?? 1);
+    }
     if (key === 'amount') return formatINRCompact(item.amountPaise);
     if (isCustomInvoiceColumnKey(key)) {
-      return tableMeta.customRowValues[rowIndex]?.[key] ?? '—';
+      return rowValues[key] ?? '—';
     }
     return '—';
   }

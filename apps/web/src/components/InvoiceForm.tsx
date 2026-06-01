@@ -8,6 +8,7 @@ import {
   composeInvoiceInternalNotes,
   defaultInvoiceTableMeta,
   getDefaultInvoiceColumnLabel,
+  INVOICE_RESERVED_ROW_VALUE_KEYS,
   isCustomInvoiceColumnKey,
   newCustomInvoiceColumnKey,
   parseInvoiceInternalNotes,
@@ -115,6 +116,14 @@ function clampNonNegativeNumber(value: string, fallback: number): number {
   return n;
 }
 
+function parseFirstIntegerFromText(value: string): number | null {
+  const m = value.match(/\d+/);
+  if (!m) return null;
+  const n = Number(m[0]);
+  if (!Number.isFinite(n) || n < 0) return null;
+  return n;
+}
+
 export function emptyInvoiceForm(): InvoiceFormValues {
   return {
     clientId: '',
@@ -159,17 +168,22 @@ export function invoiceToFormValues(
     items.length > 0
       ? items.map((it, idx) => {
           const next = blankItem();
+          const rowValues = parsed.tableMeta.customRowValues[idx] ?? {};
           next.description = it.description;
           next.period = it.period ?? '';
           next.rateLabel = it.rateLabel ?? '';
           next.rateRupees = it.ratePaise != null ? String(paiseToRupees(it.ratePaise)) : '';
-          next.days = it.days != null ? String(it.days) : '';
-          next.quantity = String(it.quantity ?? 1);
+          next.days =
+            rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.daysDisplay] ??
+            (it.days != null ? String(it.days) : '');
+          next.quantity =
+            rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.quantityDisplay] ??
+            String(it.quantity ?? 1);
           next.amountRupees = String(paiseToRupees(it.amountPaise));
 
           columns.forEach((c) => {
             if (isCustomInvoiceColumnKey(c.key)) {
-              next.customValues[c.key] = parsed.tableMeta.customRowValues[idx]?.[c.key] ?? '';
+              next.customValues[c.key] = rowValues[c.key] ?? '';
             }
           });
           return next;
@@ -200,6 +214,11 @@ export function formValuesToPayload(v: InvoiceFormValues): InvoicePayload {
 
   const customRowValues = v.items.map((it) => {
     const row: Record<string, string> = {};
+    const daysDisplay = it.days.trim();
+    const quantityDisplay = it.quantity.trim();
+    if (daysDisplay) row[INVOICE_RESERVED_ROW_VALUE_KEYS.daysDisplay] = daysDisplay;
+    if (quantityDisplay) row[INVOICE_RESERVED_ROW_VALUE_KEYS.quantityDisplay] = quantityDisplay;
+
     columns.forEach((c) => {
       if (!isCustomInvoiceColumnKey(c.key)) return;
       const raw = it.customValues[c.key] ?? '';
@@ -230,8 +249,8 @@ export function formValuesToPayload(v: InvoiceFormValues): InvoicePayload {
       period: it.period || null,
       rateLabel: it.rateLabel || null,
       ratePaise: it.rateRupees ? rupeesToPaise(clampNonNegativeNumber(it.rateRupees, 0)) : null,
-      days: it.days ? clampNonNegativeNumber(it.days, 0) : null,
-      quantity: clampNonNegativeNumber(it.quantity, 1),
+      days: parseFirstIntegerFromText(it.days),
+      quantity: parseFirstIntegerFromText(it.quantity) ?? 1,
       amountPaise: rupeesToPaise(clampNonNegativeNumber(it.amountRupees, 0)),
     })),
   };
@@ -524,19 +543,15 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                   className="px-3 py-2 border rounded-md text-sm bg-white"
                 />
                 <input
-                  type="number"
-                  min="0"
-                  step="1"
-                  placeholder="Days"
+                  type="text"
+                  placeholder="Days (e.g. 10 or 10 days)"
                   value={it.days}
                   onChange={(e) => setItem(i, { days: e.target.value })}
                   className="px-3 py-2 border rounded-md text-sm bg-white"
                 />
                 <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Quantity"
+                  type="text"
+                  placeholder="Quantity (e.g. 10 nos)"
                   value={it.quantity}
                   onChange={(e) => setItem(i, { quantity: e.target.value })}
                   className="px-3 py-2 border rounded-md text-sm bg-white"

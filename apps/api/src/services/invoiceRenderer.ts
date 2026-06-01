@@ -2,7 +2,11 @@ import type { Invoice, InvoiceItem, Client, CompanyProfile } from '../db/schema.
 import { renderTemplate } from '../lib/template.js';
 import { INVOICE_HTML_TEMPLATE, KODSPOT_DEFAULT_LOGO_SVG } from '../templates/invoice.template.js';
 import { amountInWords, formatINRCompact } from '@kodspot/shared/money';
-import { isCustomInvoiceColumnKey, parseInvoiceInternalNotes } from '@kodspot/shared/invoiceTables';
+import {
+  INVOICE_RESERVED_ROW_VALUE_KEYS,
+  isCustomInvoiceColumnKey,
+  parseInvoiceInternalNotes,
+} from '@kodspot/shared/invoiceTables';
 
 export interface RenderInvoiceArgs {
   invoice: Invoice;
@@ -51,14 +55,21 @@ function cellValueForKey(
   item: InvoiceItem,
   customRowValues: Array<Record<string, string>>,
 ): string {
+  const rowValues = customRowValues[rowIndex] ?? {};
   if (key === 'sno') return String(rowIndex + 1);
   if (key === 'description') return item.description;
   if (key === 'period') return item.period ?? '';
   if (key === 'rateLabel') return item.rateLabel ?? (item.ratePaise != null ? formatINRCompact(item.ratePaise) : '');
-  if (key === 'days') return item.days != null ? String(item.days) : '';
-  if (key === 'quantity') return String(item.quantity ?? 1);
+  if (key === 'days') {
+    return rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.daysDisplay] ??
+      (item.days != null ? String(item.days) : '');
+  }
+  if (key === 'quantity') {
+    return rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.quantityDisplay] ??
+      String(item.quantity ?? 1);
+  }
   if (key === 'amount') return formatINRCompact(item.amountPaise);
-  if (isCustomInvoiceColumnKey(key)) return customRowValues[rowIndex]?.[key] ?? '';
+  if (isCustomInvoiceColumnKey(key)) return rowValues[key] ?? '';
   return '';
 }
 

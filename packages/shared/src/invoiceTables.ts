@@ -34,6 +34,11 @@ export interface InvoiceTableMeta {
   extraTables: InvoiceExtraTableConfig[];
 }
 
+export const INVOICE_RESERVED_ROW_VALUE_KEYS = {
+  daysDisplay: 'custom:days_display',
+  quantityDisplay: 'custom:quantity_display',
+} as const;
+
 const BUILTIN_LABELS: Record<InvoiceBuiltinColumnKey, string> = {
   sno: 'S.No',
   description: 'Item Name',
@@ -159,11 +164,12 @@ export function sanitizeInvoiceTableMeta(input: unknown): InvoiceTableMeta {
 
   const columns = normalizeColumns(parsed.data.columns);
   const customKeys = new Set(columns.filter((c) => isCustomInvoiceColumnKey(c.key)).map((c) => c.key));
+  const reservedKeys = new Set<string>(Object.values(INVOICE_RESERVED_ROW_VALUE_KEYS));
 
   const customRowValues = parsed.data.customRowValues.slice(0, 400).map((row) => {
     const next: Record<string, string> = {};
     for (const [k, v] of Object.entries(row)) {
-      if (!customKeys.has(k)) continue;
+      if (!customKeys.has(k) && !reservedKeys.has(k)) continue;
       next[k] = String(v).slice(0, 200);
     }
     return next;

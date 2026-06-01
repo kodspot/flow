@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { api, fetchAssetBlobUrl } from '@/lib/api';
 import { formatINRCompact } from '@kodspot/shared/money';
+import { isCustomInvoiceColumnKey, parseInvoiceInternalNotes } from '@kodspot/shared/invoiceTables';
 import { toast } from 'sonner';
 import {
   Download,
@@ -24,6 +25,7 @@ interface InvoiceItem {
   period: string | null;
   rateLabel: string | null;
   days: number | null;
+  quantity: number | null;
   amountPaise: number;
 }
 interface Invoice {
@@ -33,6 +35,7 @@ interface Invoice {
   subtotalPaise: number;
   totalPaise: number;
   pdfR2Key: string | null;
+  internalNotes: string | null;
 }
 
 const STATUS_COLOR: Record<Invoice['status'], string> = {
@@ -124,8 +127,30 @@ export default function InvoiceDetailPage() {
 
   if (isLoading || !data) return <div className="text-slate-500">Loading…</div>;
   const { invoice, items } = data;
+  const tableMeta = parseInvoiceInternalNotes(invoice.internalNotes).tableMeta;
+  const visibleColumns = tableMeta.columns.filter((c) => c.enabled);
   const isDraft = invoice.status === 'draft';
   const isSentOrOverdue = invoice.status === 'sent' || invoice.status === 'overdue';
+
+  function getCellValue(item: InvoiceItem, rowIndex: number, key: string): string {
+    if (key === 'sno') return String(rowIndex + 1);
+    if (key === 'description') return item.description;
+    if (key === 'period') return item.period ?? '—';
+    if (key === 'rateLabel') return item.rateLabel ?? '—';
+    if (key === 'days') return item.days != null ? String(item.days) : '—';
+    if (key === 'quantity') return String(item.quantity ?? 1);
+    if (key === 'amount') return formatINRCompact(item.amountPaise);
+    if (isCustomInvoiceColumnKey(key)) {
+      return tableMeta.customRowValues[rowIndex]?.[key] ?? '—';
+    }
+    return '—';
+  }
+
+  function getCellClass(key: string): string {
+    if (key === 'amount') return 'text-right';
+    if (key === 'description' || isCustomInvoiceColumnKey(key)) return 'text-left';
+    return 'text-center';
+  }
 
   return (
     <div className="space-y-6 max-w-5xl">
@@ -225,26 +250,65 @@ export default function InvoiceDetailPage() {
           <table className="w-full text-sm min-w-[480px]">
             <thead className="bg-slate-50 text-xs uppercase">
               <tr>
-                <th className="px-3 py-2 text-left">Description</th>
-                <th className="px-3 py-2">Period</th>
-                <th className="px-3 py-2">Rate</th>
-                <th className="px-3 py-2">Days</th>
-                <th className="px-3 py-2 text-right">Amount</th>
+                {visibleColumns.map((col) => (
+                  <th key={col.key} className={`px-3 py-2 ${getCellClass(col.key)}`}>
+                    {col.label}
+                  </th>
+                ))}
               </tr>
             </thead>
             <tbody>
-              {items.map((it) => (
+              {items.map((it, rowIndex) => (
                 <tr key={it.id} className="border-t">
-                  <td className="px-3 py-2">{it.description}</td>
-                  <td className="px-3 py-2 text-center">{it.period ?? '—'}</td>
-                  <td className="px-3 py-2 text-center">{it.rateLabel ?? '—'}</td>
-                  <td className="px-3 py-2 text-center">{it.days ?? '—'}</td>
-                  <td className="px-3 py-2 text-right">{formatINRCompact(it.amountPaise)}</td>
+                  {visibleColumns.map((col) => (
+                    <td key={`${it.id}-${col.key}`} className={`px-3 py-2 ${getCellClass(col.key)}`}>
+                      {getCellValue(it, rowIndex, col.key)}
+                    </td>
+                  ))}
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
+
+        {tableMeta.extraTables.length > 0 && (
+          <div className="space-y-4 mt-6">
+            {tableMeta.extraTables.map((table) => (
+              <div key={table.id} className="overflow-x-auto">
+                <h3 className="text-sm font-semibold text-slate-700 mb-2">{table.title}</h3>
+                <table className="w-full text-sm min-w-[420px] border border-slate-200 rounded-lg overflow-hidden">
+                  <thead className="bg-slate-50 text-xs uppercase">
+                    <tr>
+                      {table.headers.map((header, idx) => (
+                        <th key={`${table.id}-h-${idx}`} className="px-3 py-2 text-left">
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {table.rows.map((row, rowIdx) => (
+                      <tr key={`${table.id}-r-${rowIdx}`} className="border-t">
+                        {table.headers.map((_, cellIdx) => (
+                          <td key={`${table.id}-c-${rowIdx}-${cellIdx}`} className="px-3 py-2">
+                            {row[cellIdx] || '—'}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                    {table.rows.length === 0 && (
+                      <tr className="border-t">
+                        <td colSpan={table.headers.length} className="px-3 py-3 text-slate-400 text-sm text-center">
+                          No rows
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
 
       <ConfirmDialog

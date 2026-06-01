@@ -72,17 +72,14 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   /* ---------- Items table ---------- */
   .section-title { font-size: 10px; font-weight: 700; color: #0f2944; letter-spacing: 1.2px; text-transform: uppercase; margin: 4px 0 6px 0; padding-bottom: 4px; border-bottom: 1px solid #e2e8f0; }
   table.items { width: 100%; border-collapse: collapse; }
-  table.items thead th { background: #0f2944; color: #fff; font-size: 10px; font-weight: 600; padding: 8px 10px; text-align: center; letter-spacing: 0.4px; text-transform: uppercase; }
-  table.items thead th:nth-child(2) { text-align: left; }
-  table.items thead th:last-child { text-align: right; }
+  table.items thead th { background: #0f2944; color: #fff; font-size: 10px; font-weight: 600; padding: 8px 10px; letter-spacing: 0.4px; text-transform: uppercase; }
   table.items tbody td { font-size: 10.5px; padding: 9px 10px; border-bottom: 1px solid #e2e8f0; vertical-align: top; color: #1f2937; }
   table.items tbody tr:nth-child(even) td { background: #f8fafc; }
-  table.items tbody td:first-child { text-align: center; width: 36px; color: #64748b; font-weight: 600; }
-  table.items tbody td:nth-child(2) { text-align: left; }
-  table.items tbody td:nth-child(3) { text-align: center; width: 110px; color: #475569; }
-  table.items tbody td:nth-child(4) { text-align: center; width: 100px; }
-  table.items tbody td:nth-child(5) { text-align: center; width: 50px; }
-  table.items tbody td:nth-child(6) { text-align: right; width: 100px; font-weight: 600; }
+  table.items .col-left { text-align: left; }
+  table.items .col-center { text-align: center; }
+  table.items .col-right { text-align: right; font-weight: 600; }
+  table.items .col-sno { text-align: center; width: 36px; color: #64748b; font-weight: 600; }
+  table.items.extra-items { margin-top: 4px; margin-bottom: 12px; }
 
   /* ---------- Summary ---------- */
   .summary-row { display: grid; grid-template-columns: 1fr 300px; gap: 14px; margin-top: 12px; margin-bottom: 12px; align-items: start; }
@@ -199,30 +196,8 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
 </div>
 
 <div class="section-title">Service Details</div>
-<table class="items">
-  <thead>
-    <tr>
-      <th>S.No</th>
-      <th>Description</th>
-      <th>Period</th>
-      <th>Rate</th>
-      <th>Days</th>
-      <th>Amount</th>
-    </tr>
-  </thead>
-  <tbody>
-    {{#each items}}
-    <tr>
-      <td>{{@number}}</td>
-      <td>{{description}}</td>
-      <td>{{period}}</td>
-      <td>{{rateLabel}}</td>
-      <td>{{days}}</td>
-      <td>{{amountFormatted}}</td>
-    </tr>
-    {{/each}}
-  </tbody>
-</table>
+{{{serviceDetailsTableHtml}}}
+{{{extraTablesHtml}}}
 
 <div class="summary-row">
   <div class="amount-words">

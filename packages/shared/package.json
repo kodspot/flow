@@ -9,7 +9,8 @@
     ".": "./src/index.ts",
     "./schemas": "./src/schemas/index.ts",
     "./constants": "./src/constants.ts",
-    "./money": "./src/money.ts"
+    "./money": "./src/money.ts",
+    "./invoiceTables": "./src/invoiceTables.ts"
   },
   "scripts": {
     "typecheck": "tsc --noEmit"

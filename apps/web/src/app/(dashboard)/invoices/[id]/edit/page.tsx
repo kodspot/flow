@@ -18,6 +18,7 @@ interface InvoiceItem {
   rateLabel: string | null;
   ratePaise: number | null;
   days: number | null;
+  quantity: number | null;
   amountPaise: number;
 }
 interface Invoice {
@@ -30,6 +31,7 @@ interface Invoice {
   gstRatePercent: number;
   gstNote: string | null;
   notes: string | null;
+  internalNotes: string | null;
 }
 
 export default function EditInvoicePage() {

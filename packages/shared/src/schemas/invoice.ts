@@ -21,7 +21,7 @@ export const invoiceCreateSchema = z.object({
   gstRatePercent: z.number().min(0).max(100).default(0),
   gstNote: z.string().max(500).optional().nullable(),
   notes: z.string().max(2000).optional().nullable(),
-  internalNotes: z.string().max(2000).optional().nullable(),
+  internalNotes: z.string().max(50000).optional().nullable(),
   idempotencyKey: z.string().max(100).optional(),
 });
 

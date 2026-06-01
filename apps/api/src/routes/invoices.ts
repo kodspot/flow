@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { and, eq } from 'drizzle-orm';
+import { and, eq, isNull } from 'drizzle-orm';
 import { invoiceCreateSchema, invoiceUpdateSchema, invoiceStatusUpdateSchema } from '@kodspot/shared/schemas';
 import { getDb } from '../db/client.js';
 import * as s from '../db/schema.js';
@@ -82,14 +82,25 @@ app.patch('/:id/status', async (c) => {
   const parsed = invoiceStatusUpdateSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'Invalid input' }, 400);
   const db = getDb(c.env.DB);
+  const id = c.req.param('id');
+  // Ensure invoice exists and is not soft-deleted before mutating
+  const existing = await db.query.invoices.findFirst({
+    where: and(
+      eq(s.invoices.id, id),
+      eq(s.invoices.workspaceId, workspaceId),
+      isNull(s.invoices.deletedAt),
+    ),
+  });
+  if (!existing) return c.json({ error: 'Not found' }, 404);
   await db
     .update(s.invoices)
     .set({
       status: parsed.data.status,
-      paidAt: parsed.data.status === 'paid' ? Date.now() : undefined,
+      // Stamp paidAt only on the transition into 'paid'; clear when leaving 'paid'
+      paidAt: parsed.data.status === 'paid' ? Date.now() : parsed.data.status === existing.status ? undefined : null,
       updatedAt: Date.now(),
     })
-    .where(and(eq(s.invoices.id, c.req.param('id')), eq(s.invoices.workspaceId, workspaceId)));
+    .where(and(eq(s.invoices.id, id), eq(s.invoices.workspaceId, workspaceId)));
   return c.json({ ok: true });
 });
 

@@ -145,7 +145,11 @@ export async function listInvoices(db: DB, workspaceId: string, opts: { limit?: 
 
 export async function getInvoiceWithItems(db: DB, workspaceId: string, id: string) {
   const invoice = await db.query.invoices.findFirst({
-    where: and(eq(s.invoices.id, id), eq(s.invoices.workspaceId, workspaceId)),
+    where: and(
+      eq(s.invoices.id, id),
+      eq(s.invoices.workspaceId, workspaceId),
+      isNull(s.invoices.deletedAt),
+    ),
   });
   if (!invoice) return null;
   const items = await db.query.invoiceItems.findMany({

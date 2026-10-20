@@ -101,7 +101,7 @@ export default function InvoicesPage() {
               key={f.value}
               onClick={() => setStatusFilter(f.value)}
               aria-pressed={statusFilter === f.value}
-              className={`px-3 py-2.5 sm:py-1.5 rounded-md text-xs font-semibold border transition ${
+              className={`px-3 py-3 sm:py-1.5 rounded-md text-xs font-semibold border transition ${
                 statusFilter === f.value
                   ? 'bg-kodspot text-white border-kodspot'
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'

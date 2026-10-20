@@ -440,7 +440,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
           <button
             type="button"
             onClick={addCustomColumn}
-            className="inline-flex items-center gap-1 text-sm text-kodspot font-semibold"
+            className="inline-flex items-center gap-1 py-2 -my-2 text-sm text-kodspot font-semibold"
           >
             <Plus className="size-4" /> Add custom column
           </button>
@@ -492,7 +492,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
           <button
             type="button"
             onClick={() => setV((p) => ({ ...p, items: [...p.items, blankItem()] }))}
-            className="inline-flex items-center gap-1 text-sm text-kodspot font-semibold"
+            className="inline-flex items-center gap-1 py-2 -my-2 text-sm text-kodspot font-semibold"
           >
             <Plus className="size-4" /> Add item
           </button>
@@ -632,7 +632,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
           <button
             type="button"
             onClick={addExtraTable}
-            className="inline-flex items-center gap-1 text-sm text-kodspot font-semibold"
+            className="inline-flex items-center gap-1 py-2 -my-2 text-sm text-kodspot font-semibold"
           >
             <Plus className="size-4" /> Add table
           </button>
@@ -712,7 +712,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                     return { ...t, headers: nextHeaders, rows };
                   })
                 }
-                className="inline-flex items-center gap-1 text-xs text-kodspot font-semibold"
+                className="inline-flex items-center gap-1 py-2 sm:py-0 text-xs text-kodspot font-semibold"
               >
                 <Plus className="size-3" /> Add header
               </button>
@@ -765,7 +765,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                     rows: [...t.rows, t.headers.map(() => '')],
                   }))
                 }
-                className="inline-flex items-center gap-1 text-xs text-kodspot font-semibold"
+                className="inline-flex items-center gap-1 py-2 sm:py-0 text-xs text-kodspot font-semibold"
               >
                 <Plus className="size-3" /> Add row
               </button>

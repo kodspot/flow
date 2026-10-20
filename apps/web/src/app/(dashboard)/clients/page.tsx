@@ -166,9 +166,9 @@ export default function ClientsPage() {
               )}
               {!isLoading && data?.clients.map((c) => (
                 <tr key={c.id} className="border-t hover:bg-slate-50">
-                  <td className="px-4 py-3 font-medium">{c.name}</td>
-                  <td className="px-4 py-3 text-slate-600">{c.company ?? '—'}</td>
-                  <td className="px-4 py-3 text-slate-600">{c.email ?? '—'}</td>
+                  <td className="px-4 py-3 font-medium [overflow-wrap:anywhere]">{c.name}</td>
+                  <td className="px-4 py-3 text-slate-600 [overflow-wrap:anywhere]">{c.company ?? '—'}</td>
+                  <td className="px-4 py-3 text-slate-600 [overflow-wrap:anywhere]">{c.email ?? '—'}</td>
                   <td className="px-4 py-3 text-slate-600">{c.city ?? '—'}</td>
                   <td className="px-4 py-3 text-right">
                     <div className="inline-flex gap-1">

@@ -143,6 +143,24 @@ Open http://localhost:3000 → sign up → create client → create invoice → 
 
 > **Browser Rendering doesn't work in `wrangler dev` locally** — for full PDF testing, deploy to a `--env=staging` worker or `wrangler dev --remote`.
 
+### Tests
+
+```powershell
+pnpm test        # unit tests (Vitest) for apps/api and apps/web
+pnpm typecheck
+```
+
+- `apps/api`: invoice creation (numbering, duplicate-request protection incl. concurrent requests) and the invoice renderer (hidden columns, print vs. screen layout).
+- `apps/web`: invoice form data — hidden-column values through save/reopen/copy, copy mapping, item order.
+
+## 🧾 Invoice behaviour notes
+
+- **Numbers** come only from a successful `POST /v1/invoices` (per-workspace Durable Object counter, by invoice-date year). Opening a form never uses a number.
+- **Duplicate protection:** the New and Copy pages send one `idempotencyKey` per visit; repeated taps, retries after a lost response, and concurrent duplicates all resolve to the same invoice. Opening New or Copy again is a new intended invoice with a new key.
+- **Hidden columns** (unticked Days, Quantity, Period, Rate, custom) hide their inputs and are left off the invoice page, preview and PDF, but their values are kept: saved, restored when the column is ticked again, and carried into copies. Totals come only from each item's Amount (+ GST).
+- **Create a copy** (invoice page or invoice list, any status) opens a pre-filled New invoice: customer, items, column settings, additional tables, tax settings and notes; the invoice date is set to today and periods are flagged for review. Saving creates a separate draft with a new id and number; the source invoice, its status, payments and PDF are never touched or copied.
+- **Preview** lays the A4 sheet out at 840px wide on screens so phones open the whole page fitted (pinch-zoom available); print/PDF use `@page A4` and are unaffected.
+
 ## 📱 Responsive / mobile conventions (`apps/web`)
 
 - **Breakpoints:** phones < `sm` (640px) get stacked cards instead of tables; the fixed sidebar appears from `lg` (1024px). Below that (phones, tablets in portrait, phone landscape) navigation is the drawer behind the top-bar menu button.

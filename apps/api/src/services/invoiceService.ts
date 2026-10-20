@@ -1,4 +1,4 @@
-import { eq, and, desc, isNull, sql } from 'drizzle-orm';
+import { eq, and, asc, desc, isNull, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import type { DB } from '../db/client.js';
 import * as s from '../db/schema.js';
@@ -22,6 +22,13 @@ function toDateMs(input: string | number): number {
   return d.getTime();
 }
 
+async function findByIdempotencyKey(db: DB, workspaceId: string, key: string) {
+  const existing = await db.query.invoices.findFirst({
+    where: and(eq(s.invoices.workspaceId, workspaceId), eq(s.invoices.idempotencyKey, key)),
+  });
+  return existing ? { id: existing.id, invoiceNumber: existing.invoiceNumber } : null;
+}
+
 export async function createInvoice(
   { db, counter }: CreateInvoiceDeps,
   workspaceId: string,
@@ -29,13 +36,8 @@ export async function createInvoice(
 ): Promise<{ id: string; invoiceNumber: string }> {
   // Idempotency
   if (input.idempotencyKey) {
-    const existing = await db.query.invoices.findFirst({
-      where: and(
-        eq(s.invoices.workspaceId, workspaceId),
-        eq(s.invoices.idempotencyKey, input.idempotencyKey),
-      ),
-    });
-    if (existing) return { id: existing.id, invoiceNumber: existing.invoiceNumber };
+    const existing = await findByIdempotencyKey(db, workspaceId, input.idempotencyKey);
+    if (existing) return existing;
   }
 
   // Load company + client snapshot
@@ -71,7 +73,7 @@ export async function createInvoice(
   const now = Date.now();
   const dueDateMs = input.dueDate ? toDateMs(input.dueDate) : null;
 
-  await db.batch([
+  const writes = [
     db.insert(s.invoices).values({
       id,
       workspaceId,
@@ -124,7 +126,20 @@ export async function createInvoice(
       metadata: JSON.stringify({ invoiceNumber, total }),
       createdAt: now,
     }),
-  ] as const);
+  ] as const;
+
+  try {
+    await db.batch(writes);
+  } catch (err) {
+    // A concurrent request with the same key can pass the check above before the first one
+    // commits. The unique (workspace, idempotency_key) index rejects this batch atomically,
+    // so the invoice the first request created is the answer to this one too.
+    if (input.idempotencyKey) {
+      const existing = await findByIdempotencyKey(db, workspaceId, input.idempotencyKey);
+      if (existing) return existing;
+    }
+    throw err;
+  }
 
   return { id, invoiceNumber };
 }
@@ -152,8 +167,10 @@ export async function getInvoiceWithItems(db: DB, workspaceId: string, id: strin
     ),
   });
   if (!invoice) return null;
+  // Row order matters: per-row column values in internal_notes are matched by position.
   const items = await db.query.invoiceItems.findMany({
     where: eq(s.invoiceItems.invoiceId, id),
+    orderBy: asc(s.invoiceItems.position),
   });
   return { invoice, items };
 }

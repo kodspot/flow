@@ -9,6 +9,7 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
+    "test": "vitest run",
     "build:cf": "opennextjs-cloudflare build",
     "cf:deploy": "opennextjs-cloudflare build && wrangler deploy",
     "deploy": "opennextjs-cloudflare build && wrangler deploy",
@@ -49,6 +50,7 @@
     "eslint": "^9.14.0",
     "eslint-config-next": "15.1.6",
     "@opennextjs/cloudflare": "^1.0.0",
-    "wrangler": "^4.0.0"
+    "wrangler": "^4.0.0",
+    "vitest": "2.1.9"
   }
 }

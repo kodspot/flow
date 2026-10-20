@@ -8,7 +8,9 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<!-- Lay out at the A4 sheet's width (210mm ≈ 794px + margin) so phones open the whole page fitted
+     to the screen; pinch-zoom stays available. Print/PDF ignore this and use @page A4. -->
+<meta name="viewport" content="width=840">
 <title>Invoice - {{invoiceNumber}}</title>
 <style>
   /* ---------- Page ---------- */
@@ -136,6 +138,15 @@ export const INVOICE_HTML_TEMPLATE = String.raw`<!DOCTYPE html>
   .summary-table tr.total td, table.items thead th, .party-title { background: #0b2138 !important; }
 
   table.items tr, .signatures, .declaration-box, .summary-row, .payment-grid { page-break-inside: avoid; }
+
+  /* ---------- On-screen preview only ----------
+     Centre the sheet on a neutral background, and stop mobile browsers from enlarging some
+     text blocks (text autosizing), which would distort the document's proportions. Print and
+     PDF rendering use print media, so none of this applies to them. */
+  @media screen {
+    html { width: auto; background: #e2e8f0; -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+    body { margin: 16px auto; box-shadow: 0 1px 6px rgba(15, 41, 68, 0.18); }
+  }
 </style>
 </head>
 <body>

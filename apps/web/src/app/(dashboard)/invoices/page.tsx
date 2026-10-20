@@ -2,7 +2,7 @@
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import Link from 'next/link';
-import { Plus, Search } from 'lucide-react';
+import { Copy, Plus, Search } from 'lucide-react';
 import { formatINRCompact } from '@kodspot/shared/money';
 import { useMemo, useState } from 'react';
 
@@ -131,27 +131,36 @@ export default function InvoicesPage() {
         )}
         {!isLoading &&
           filtered.map((inv) => (
-            <Link
-              key={inv.id}
-              href={`/invoices/${inv.id}`}
-              className="block bg-white border rounded-xl p-4 hover:bg-slate-50"
-            >
-              <div className="flex items-start justify-between gap-2">
-                <span className="font-mono text-kodspot font-semibold text-sm">{inv.invoiceNumber}</span>
-                <span className={`px-2 py-0.5 rounded text-xs font-semibold shrink-0 ${STATUS_COLOR[inv.status]}`}>
-                  {inv.status}
-                </span>
-              </div>
-              <div className="text-xs text-slate-500 mt-1 truncate">
-                {clientNameById.get(inv.clientId) ?? '—'}
-              </div>
-              <div className="mt-2 flex items-center justify-between">
-                <span className="text-xs text-slate-500">
-                  {new Date(inv.invoiceDate).toLocaleDateString('en-IN')}
-                </span>
-                <span className="font-semibold text-sm">{formatINRCompact(inv.totalPaise)}</span>
-              </div>
-            </Link>
+            <div key={inv.id} className="bg-white border rounded-xl flex items-stretch">
+              <Link
+                href={`/invoices/${inv.id}`}
+                className="block flex-1 min-w-0 p-4 rounded-l-xl hover:bg-slate-50"
+              >
+                <div className="flex items-start justify-between gap-2">
+                  <span className="font-mono text-kodspot font-semibold text-sm">{inv.invoiceNumber}</span>
+                  <span className={`px-2 py-0.5 rounded text-xs font-semibold shrink-0 ${STATUS_COLOR[inv.status]}`}>
+                    {inv.status}
+                  </span>
+                </div>
+                <div className="text-xs text-slate-500 mt-1 truncate">
+                  {clientNameById.get(inv.clientId) ?? '—'}
+                </div>
+                <div className="mt-2 flex items-center justify-between">
+                  <span className="text-xs text-slate-500">
+                    {new Date(inv.invoiceDate).toLocaleDateString('en-IN')}
+                  </span>
+                  <span className="font-semibold text-sm">{formatINRCompact(inv.totalPaise)}</span>
+                </div>
+              </Link>
+              <Link
+                href={`/invoices/${inv.id}/copy`}
+                title="Create a copy"
+                aria-label={`Create a copy of ${inv.invoiceNumber}`}
+                className="shrink-0 flex items-center px-3 border-l text-slate-500 hover:text-kodspot hover:bg-slate-50 rounded-r-xl"
+              >
+                <Copy className="size-4" />
+              </Link>
+            </div>
           ))}
       </div>
 
@@ -185,10 +194,20 @@ export default function InvoicesPage() {
                       </span>
                     </td>
                     <td className="px-4 py-3 text-right font-semibold">{formatINRCompact(inv.totalPaise)}</td>
-                    <td className="px-4 py-3 text-right">
-                      <Link href={`/invoices/${inv.id}`} className="text-kodspot font-semibold hover:underline">
-                        Open
-                      </Link>
+                    <td className="px-4 py-3">
+                      {/* Wraps onto two lines when the table is tight rather than forcing a sideways scroll. */}
+                      <div className="flex flex-wrap justify-end gap-x-4 gap-y-1">
+                        <Link href={`/invoices/${inv.id}`} className="text-kodspot font-semibold hover:underline">
+                          Open
+                        </Link>
+                        <Link
+                          href={`/invoices/${inv.id}/copy`}
+                          aria-label={`Create a copy of ${inv.invoiceNumber}`}
+                          className="text-slate-600 font-semibold hover:text-kodspot hover:underline"
+                        >
+                          Copy
+                        </Link>
+                      </div>
                     </td>
                   </tr>
                 ))}

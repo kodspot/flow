@@ -1,20 +1,27 @@
 'use client';
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Plus, Trash2 } from 'lucide-react';
-import { rupeesToPaise, paiseToRupees, formatINRCompact } from '@kodspot/shared/money';
+import { rupeesToPaise, formatINRCompact } from '@kodspot/shared/money';
 import {
-  composeInvoiceInternalNotes,
-  defaultInvoiceTableMeta,
   getDefaultInvoiceColumnLabel,
-  INVOICE_RESERVED_ROW_VALUE_KEYS,
   isCustomInvoiceColumnKey,
   newCustomInvoiceColumnKey,
-  parseInvoiceInternalNotes,
   type InvoiceExtraTableConfig,
   type InvoiceTableColumnConfig,
 } from '@kodspot/shared/invoiceTables';
+import {
+  blankItem,
+  clampNonNegativeNumber,
+  columnValueCount,
+  formValuesToPayload,
+  normalizeExtraTables,
+  syncItemCustomValues,
+  type InvoiceFormItem,
+  type InvoiceFormValues,
+  type InvoicePayload,
+} from '@/lib/invoiceForm';
 
 interface Client {
   id: string;
@@ -22,269 +29,58 @@ interface Client {
   company: string | null;
 }
 
-export interface InvoiceFormItem {
-  description: string;
-  period: string;
-  rateLabel: string;
-  rateRupees: string;
-  days: string;
-  quantity: string;
-  amountRupees: string;
-  customValues: Record<string, string>;
-}
-
-export interface InvoiceFormValues {
-  clientId: string;
-  invoiceDate: string;
-  placeOfSupply: string;
-  gstApplicable: boolean;
-  gstRatePercent: number;
-  gstNote: string;
-  notes: string;
-  internalNotesPlain: string;
-  columns: InvoiceTableColumnConfig[];
-  extraTables: InvoiceExtraTableConfig[];
-  items: InvoiceFormItem[];
-}
-
-export interface InvoicePayload {
-  clientId: string;
-  invoiceDate: string;
-  placeOfSupply: string;
-  gstApplicable: boolean;
-  gstRatePercent: number;
-  gstNote: string | null;
-  notes: string;
-  internalNotes: string | null;
-  items: Array<{
-    description: string;
-    period: string | null;
-    rateLabel: string | null;
-    ratePaise: number | null;
-    days: number | null;
-    quantity: number;
-    amountPaise: number;
-  }>;
-}
-
-export const blankItem = (): InvoiceFormItem => ({
-  description: '',
-  period: '',
-  rateLabel: '',
-  rateRupees: '',
-  days: '',
-  quantity: '1',
-  amountRupees: '',
-  customValues: {},
-});
-
-export const defaultGstNote =
-  'This transaction is exempt from GST under Section 22 of the Central Goods and Services Tax Act, 2017 as the aggregate turnover of KODSPOT is below the prescribed threshold limit of Rs 20 lakh. No GST will be charged or collected. HSN Code: 998313 (IT Services).';
-
-export const defaultNotes = 'Note: Invoice is generated at the end of every month.';
-
-function normalizeExtraTables(tables: InvoiceExtraTableConfig[]): InvoiceExtraTableConfig[] {
-  return tables.map((t, idx) => ({
-    id: t.id || `table_${idx + 1}`,
-    title: t.title || `Additional Table ${idx + 1}`,
-    headers: t.headers.length > 0 ? t.headers : ['Column 1'],
-    rows: t.rows.map((row) => {
-      const next = [...row];
-      while (next.length < (t.headers.length || 1)) next.push('');
-      return next.slice(0, t.headers.length || 1);
-    }),
-  }));
-}
-
-function syncItemCustomValues(
-  items: InvoiceFormItem[],
-  columns: InvoiceTableColumnConfig[],
-): InvoiceFormItem[] {
-  const customKeys = columns.filter((c) => isCustomInvoiceColumnKey(c.key)).map((c) => c.key);
-  return items.map((it) => {
-    const next: Record<string, string> = {};
-    customKeys.forEach((k) => {
-      next[k] = it.customValues[k] ?? '';
-    });
-    return { ...it, customValues: next };
-  });
-}
-
-function clampNonNegativeNumber(value: string, fallback: number): number {
-  const n = Number(value);
-  if (!Number.isFinite(n) || n < 0) return fallback;
-  return n;
-}
-
-function parseFirstIntegerFromText(value: string): number | null {
-  const m = value.match(/\d+/);
-  if (!m) return null;
-  const n = Number(m[0]);
-  if (!Number.isFinite(n) || n < 0) return null;
-  return n;
-}
-
-export function emptyInvoiceForm(): InvoiceFormValues {
-  return {
-    clientId: '',
-    invoiceDate: new Date().toISOString().slice(0, 10),
-    placeOfSupply: 'Karnataka (29)',
-    gstApplicable: false,
-    gstRatePercent: 18,
-    gstNote: defaultGstNote,
-    notes: defaultNotes,
-    internalNotesPlain: '',
-    columns: defaultInvoiceTableMeta().columns,
-    extraTables: [],
-    items: [blankItem()],
-  };
-}
-
-/** Convert API InvoiceItem rows + Invoice to a form values object for editing. */
-export function invoiceToFormValues(
-  inv: {
-    clientId: string;
-    invoiceDate: number;
-    placeOfSupply: string | null;
-    gstApplicable: boolean;
-    gstRatePercent: number; // basis points x100 in DB
-    gstNote: string | null;
-    notes: string | null;
-    internalNotes?: string | null;
-  },
-  items: Array<{
-    description: string;
-    period: string | null;
-    rateLabel: string | null;
-    ratePaise: number | null;
-    days: number | null;
-    quantity: number | null;
-    amountPaise: number;
-  }>,
-): InvoiceFormValues {
-  const parsed = parseInvoiceInternalNotes(inv.internalNotes);
-  const columns = parsed.tableMeta.columns;
-  const hydratedItems =
-    items.length > 0
-      ? items.map((it, idx) => {
-          const next = blankItem();
-          const rowValues = parsed.tableMeta.customRowValues[idx] ?? {};
-          next.description = it.description;
-          next.period = it.period ?? '';
-          next.rateLabel = it.rateLabel ?? '';
-          next.rateRupees = it.ratePaise != null ? String(paiseToRupees(it.ratePaise)) : '';
-          next.days =
-            rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.daysDisplay] ??
-            (it.days != null ? String(it.days) : '');
-          next.quantity =
-            rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.quantityDisplay] ??
-            String(it.quantity ?? 1);
-          next.amountRupees = String(paiseToRupees(it.amountPaise));
-
-          columns.forEach((c) => {
-            if (isCustomInvoiceColumnKey(c.key)) {
-              next.customValues[c.key] = rowValues[c.key] ?? '';
-            }
-          });
-          return next;
-        })
-      : [blankItem()];
-
-  return {
-    clientId: inv.clientId,
-    invoiceDate: new Date(inv.invoiceDate).toISOString().slice(0, 10),
-    placeOfSupply: inv.placeOfSupply ?? 'Karnataka (29)',
-    gstApplicable: inv.gstApplicable,
-    gstRatePercent: inv.gstRatePercent / 100,
-    gstNote: inv.gstNote ?? defaultGstNote,
-    notes: inv.notes ?? '',
-    internalNotesPlain: parsed.plainText ?? '',
-    columns,
-    extraTables: normalizeExtraTables(parsed.tableMeta.extraTables),
-    items: syncItemCustomValues(hydratedItems, columns),
-  };
-}
-
-export function formValuesToPayload(v: InvoiceFormValues): InvoicePayload {
-  const columns = v.columns.map((c) => ({
-    key: c.key,
-    label: c.label.trim() || getDefaultInvoiceColumnLabel(c.key),
-    enabled: c.enabled,
-  }));
-
-  const customRowValues = v.items.map((it) => {
-    const row: Record<string, string> = {};
-    const daysDisplay = it.days.trim();
-    const quantityDisplay = it.quantity.trim();
-    if (daysDisplay) row[INVOICE_RESERVED_ROW_VALUE_KEYS.daysDisplay] = daysDisplay;
-    if (quantityDisplay) row[INVOICE_RESERVED_ROW_VALUE_KEYS.quantityDisplay] = quantityDisplay;
-
-    columns.forEach((c) => {
-      if (!isCustomInvoiceColumnKey(c.key)) return;
-      const raw = it.customValues[c.key] ?? '';
-      const trimmed = raw.trim();
-      if (trimmed) row[c.key] = trimmed;
-    });
-    return row;
-  });
-
-  const internalNotes = composeInvoiceInternalNotes(v.internalNotesPlain, {
-    version: 1,
-    columns,
-    customRowValues,
-    extraTables: v.extraTables,
-  });
-
-  return {
-    clientId: v.clientId,
-    invoiceDate: v.invoiceDate,
-    placeOfSupply: v.placeOfSupply,
-    gstApplicable: v.gstApplicable,
-    gstRatePercent: v.gstApplicable ? v.gstRatePercent : 0,
-    gstNote: v.gstApplicable ? null : v.gstNote,
-    notes: v.notes,
-    internalNotes,
-    items: v.items.map((it) => ({
-      description: it.description,
-      period: it.period || null,
-      rateLabel: it.rateLabel || null,
-      ratePaise: it.rateRupees ? rupeesToPaise(clampNonNegativeNumber(it.rateRupees, 0)) : null,
-      days: parseFirstIntegerFromText(it.days),
-      quantity: parseFirstIntegerFromText(it.quantity) ?? 1,
-      amountPaise: rupeesToPaise(clampNonNegativeNumber(it.amountRupees, 0)),
-    })),
-  };
-}
-
 interface Props {
+  /** Read once on mount; remount (change `key`) to load different values. */
   initial: InvoiceFormValues;
   submitLabel: string;
   submitting: boolean;
-  onSubmit: (payload: InvoicePayload) => void;
+  /** Reject to keep the form as-is for a retry; the caller reports the error. */
+  onSubmit: (payload: InvoicePayload) => void | Promise<unknown>;
   extraAction?: React.ReactNode;
   title: string;
+  notice?: React.ReactNode;
+  /** Highlight period descriptions that still match `initial` (used when copying). */
+  reviewPeriods?: boolean;
 }
 
-export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraAction, title }: Props) {
+const inputCls = 'w-full px-3 py-2 border rounded-md text-base sm:text-sm bg-white';
+const labelCls = 'block text-xs font-medium text-slate-600 mb-1';
+
+export function InvoiceForm({
+  initial,
+  submitLabel,
+  submitting,
+  onSubmit,
+  extraAction,
+  title,
+  notice,
+  reviewPeriods = false,
+}: Props) {
   const { data: clientData, isLoading: clientsLoading } = useQuery({
     queryKey: ['clients'],
     queryFn: () => api<{ clients: Client[] }>('/v1/clients'),
   });
 
-  const [v, setV] = useState<InvoiceFormValues>(initial);
+  const [v, setV] = useState<InvoiceFormValues>(() => ({
+    ...initial,
+    items: syncItemCustomValues(initial.items, initial.columns),
+    extraTables: normalizeExtraTables(initial.extraTables),
+  }));
+  const [initialPeriods] = useState(() => initial.items.map((it) => it.period));
 
-  useEffect(() => {
-    setV({
-      ...initial,
-      items: syncItemCustomValues(initial.items, initial.columns),
-      extraTables: normalizeExtraTables(initial.extraTables),
-    });
-  }, [initial]);
+  // Synchronous guard: a double tap fires twice before `submitting` re-renders the button.
+  const submitLock = useRef(false);
+  const [pending, setPending] = useState(false);
+  const busy = submitting || pending;
 
   const customColumns = useMemo(
     () => v.columns.filter((c) => isCustomInvoiceColumnKey(c.key)),
     [v.columns],
   );
+
+  const column = (key: string) => v.columns.find((c) => c.key === key);
+  const isShown = (key: string) => column(key)?.enabled ?? false;
+  const labelOf = (key: string) => column(key)?.label.trim() || getDefaultInvoiceColumnLabel(key);
 
   const subtotal = v.items.reduce((s, it) => s + (Number(it.amountRupees) || 0), 0);
   const gstAmount = v.gstApplicable ? Math.round(subtotal * v.gstRatePercent) / 100 : 0;
@@ -372,11 +168,20 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
     }));
   }
 
-  function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (!v.clientId) return;
-    const normalizedItems = syncItemCustomValues(v.items, v.columns);
-    onSubmit(formValuesToPayload({ ...v, items: normalizedItems }));
+    if (submitLock.current || !v.clientId) return;
+    submitLock.current = true;
+    setPending(true);
+    try {
+      const normalizedItems = syncItemCustomValues(v.items, v.columns);
+      await onSubmit(formValuesToPayload({ ...v, items: normalizedItems }));
+    } catch {
+      // The caller reports the error; values stay in the form so the user can retry.
+    } finally {
+      submitLock.current = false;
+      setPending(false);
+    }
   }
 
   return (
@@ -387,18 +192,21 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
           {extraAction}
           <button
             type="submit"
-            disabled={submitting}
+            disabled={busy}
             className="shrink-0 px-4 py-2 rounded-md bg-kodspot text-white font-semibold disabled:opacity-50 text-sm"
           >
-            {submitting ? 'Saving...' : submitLabel}
+            {busy ? 'Saving...' : submitLabel}
           </button>
         </div>
       </div>
 
+      {notice}
+
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-white border rounded-xl p-4 sm:p-5">
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Client *</label>
+          <label htmlFor="invoice-client" className={labelCls}>Client *</label>
           <select
+            id="invoice-client"
             required
             value={v.clientId}
             onChange={(e) => setV((p) => ({ ...p, clientId: e.target.value }))}
@@ -415,8 +223,9 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
           </select>
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Invoice date *</label>
+          <label htmlFor="invoice-date" className={labelCls}>Invoice date *</label>
           <input
+            id="invoice-date"
             type="date"
             required
             value={v.invoiceDate}
@@ -425,8 +234,9 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
           />
         </div>
         <div>
-          <label className="block text-xs font-medium text-slate-600 mb-1">Place of supply</label>
+          <label htmlFor="invoice-place" className={labelCls}>Place of supply</label>
           <input
+            id="invoice-place"
             value={v.placeOfSupply}
             onChange={(e) => setV((p) => ({ ...p, placeOfSupply: e.target.value }))}
             className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
@@ -449,6 +259,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
         <div className="space-y-2">
           {v.columns.map((col, idx) => {
             const locked = col.key === 'description' || col.key === 'amount';
+            const keptValues = col.enabled ? 0 : columnValueCount(col.key, v.items);
             return (
               <div key={col.key} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto_auto] gap-2 items-center p-3 border rounded-md bg-slate-50">
                 <div>
@@ -459,6 +270,12 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                     className="w-full px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                   />
                   <div className="text-[11px] text-slate-500 mt-1">{col.key}</div>
+                  {keptValues > 0 && (
+                    <div className="text-xs text-amber-700 mt-1">
+                      Hidden on the invoice. {keptValues} item{keptValues === 1 ? '' : 's'} keep
+                      {keptValues === 1 ? 's' : ''} a value; tick Visible to see or edit it.
+                    </div>
+                  )}
                 </div>
                 <label className="inline-flex items-center gap-2 text-sm text-slate-700">
                   <input
@@ -499,91 +316,138 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
         </div>
 
         <div className="space-y-3">
-          {v.items.map((it, i) => (
-            <div key={i} className="flex flex-col gap-3 p-3 border rounded-lg bg-slate-50">
-              <div className="flex gap-2">
-                <input
-                  placeholder="Item name / description *"
-                  required
-                  value={it.description}
-                  onChange={(e) => setItem(i, { description: e.target.value })}
-                  className="flex-1 min-w-0 px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
-                />
-                <button
-                  type="button"
-                  onClick={() => setV((p) => ({ ...p, items: p.items.filter((_, idx) => idx !== i) }))}
-                  disabled={v.items.length === 1}
-                  aria-label="Remove item"
-                  className="shrink-0 p-3 sm:p-2 text-rose-600 hover:bg-rose-100 rounded disabled:opacity-30"
-                  title={v.items.length === 1 ? 'At least one item required' : 'Remove item'}
-                >
-                  <Trash2 className="size-4" />
-                </button>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-2">
-                <input
-                  placeholder="Period"
-                  value={it.period}
-                  onChange={(e) => setItem(i, { period: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
-                />
-                <input
-                  placeholder="Rate label"
-                  value={it.rateLabel}
-                  onChange={(e) => setItem(i, { rateLabel: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Rate Rs"
-                  value={it.rateRupees}
-                  onChange={(e) => setItem(i, { rateRupees: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
-                />
-                <input
-                  type="text"
-                  placeholder="Days (e.g. 10 or 10 days)"
-                  value={it.days}
-                  onChange={(e) => setItem(i, { days: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
-                />
-                <input
-                  type="text"
-                  placeholder="Quantity (e.g. 10 nos)"
-                  value={it.quantity}
-                  onChange={(e) => setItem(i, { quantity: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
-                />
-                <input
-                  type="number"
-                  min="0"
-                  step="0.01"
-                  placeholder="Amount Rs *"
-                  required
-                  value={it.amountRupees}
-                  onChange={(e) => setItem(i, { amountRupees: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
-                />
-              </div>
-
-              {customColumns.length > 0 && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
-                  {customColumns.map((col) => (
+          {v.items.map((it, i) => {
+            const id = (key: string) => `item-${i}-${key.replace(/[^a-z0-9_-]/gi, '_')}`;
+            const periodNeedsReview =
+              reviewPeriods && it.period.trim() !== '' && it.period === initialPeriods[i];
+            return (
+              <div key={i} className="flex flex-col gap-3 p-3 border rounded-lg bg-slate-50">
+                <div className="flex items-end gap-2">
+                  <div className="flex-1 min-w-0">
+                    <label htmlFor={id('description')} className={labelCls}>
+                      Item {i + 1}: {labelOf('description')} *
+                    </label>
                     <input
-                      key={col.key}
-                      placeholder={col.label || 'Custom value'}
-                      value={it.customValues[col.key] ?? ''}
-                      onChange={(e) => setItemCustomValue(i, col.key, e.target.value)}
-                      className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
+                      id={id('description')}
+                      required
+                      value={it.description}
+                      onChange={(e) => setItem(i, { description: e.target.value })}
+                      className={inputCls}
                     />
-                  ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setV((p) => ({ ...p, items: p.items.filter((_, idx) => idx !== i) }))}
+                    disabled={v.items.length === 1}
+                    aria-label={`Remove item ${i + 1}`}
+                    className="shrink-0 p-3 sm:p-2 text-rose-600 hover:bg-rose-100 rounded disabled:opacity-30"
+                    title={v.items.length === 1 ? 'At least one item required' : 'Remove item'}
+                  >
+                    <Trash2 className="size-4" />
+                  </button>
                 </div>
-              )}
-            </div>
-          ))}
+
+                {/* Only columns ticked Visible get inputs; hidden columns keep their values. */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-2">
+                  {isShown('period') && (
+                    <div>
+                      <label htmlFor={id('period')} className={labelCls}>{labelOf('period')}</label>
+                      <input
+                        id={id('period')}
+                        placeholder="e.g. 1–31 Oct 2026"
+                        value={it.period}
+                        onChange={(e) => setItem(i, { period: e.target.value })}
+                        aria-describedby={periodNeedsReview ? id('period-review') : undefined}
+                        className={`${inputCls} ${periodNeedsReview ? 'border-amber-400 bg-amber-50' : ''}`}
+                      />
+                      {periodNeedsReview && (
+                        <p id={id('period-review')} className="text-xs text-amber-700 mt-1">
+                          Copied as-is. Check this period.
+                        </p>
+                      )}
+                    </div>
+                  )}
+                  {isShown('rateLabel') && (
+                    <>
+                      <div>
+                        <label htmlFor={id('rateLabel')} className={labelCls}>{labelOf('rateLabel')} (as printed)</label>
+                        <input
+                          id={id('rateLabel')}
+                          placeholder="e.g. ₹12,000/month"
+                          value={it.rateLabel}
+                          onChange={(e) => setItem(i, { rateLabel: e.target.value })}
+                          className={inputCls}
+                        />
+                      </div>
+                      <div>
+                        <label htmlFor={id('rateRupees')} className={labelCls}>{labelOf('rateLabel')} ₹ (if no text)</label>
+                        <input
+                          id={id('rateRupees')}
+                          type="number"
+                          min="0"
+                          step="0.01"
+                          value={it.rateRupees}
+                          onChange={(e) => setItem(i, { rateRupees: e.target.value })}
+                          className={inputCls}
+                        />
+                      </div>
+                    </>
+                  )}
+                  {isShown('days') && (
+                    <div>
+                      <label htmlFor={id('days')} className={labelCls}>{labelOf('days')}</label>
+                      <input
+                        id={id('days')}
+                        type="text"
+                        placeholder="e.g. 10 or 10 days"
+                        value={it.days}
+                        onChange={(e) => setItem(i, { days: e.target.value })}
+                        className={inputCls}
+                      />
+                    </div>
+                  )}
+                  {isShown('quantity') && (
+                    <div>
+                      <label htmlFor={id('quantity')} className={labelCls}>{labelOf('quantity')}</label>
+                      <input
+                        id={id('quantity')}
+                        type="text"
+                        placeholder="e.g. 10 nos"
+                        value={it.quantity}
+                        onChange={(e) => setItem(i, { quantity: e.target.value })}
+                        className={inputCls}
+                      />
+                    </div>
+                  )}
+                  {customColumns.filter((col) => col.enabled).map((col) => (
+                    <div key={col.key}>
+                      <label htmlFor={id(col.key)} className={labelCls}>{labelOf(col.key)}</label>
+                      <input
+                        id={id(col.key)}
+                        value={it.customValues[col.key] ?? ''}
+                        onChange={(e) => setItemCustomValue(i, col.key, e.target.value)}
+                        className={inputCls}
+                      />
+                    </div>
+                  ))}
+                  <div>
+                    <label htmlFor={id('amount')} className={labelCls}>{labelOf('amount')} ₹ *</label>
+                    <input
+                      id={id('amount')}
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      inputMode="decimal"
+                      required
+                      value={it.amountRupees}
+                      onChange={(e) => setItem(i, { amountRupees: e.target.value })}
+                      className={inputCls}
+                    />
+                  </div>
+                </div>
+              </div>
+            );
+          })}
         </div>
 
         <div className="mt-5 flex justify-end">
@@ -606,6 +470,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                   type="number"
                   min="0"
                   max="100"
+                  aria-label="GST rate percent"
                   value={v.gstRatePercent}
                   onChange={(e) =>
                     setV((p) => ({
@@ -656,6 +521,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                   }))
                 }
                 placeholder="Table title"
+                aria-label="Table title"
                 className="flex-1 px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
               />
               <button
@@ -680,6 +546,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                           headers: t.headers.map((h, idx) => (idx === headerIdx ? e.target.value : h)),
                         }))
                       }
+                      aria-label={`Header ${headerIdx + 1}`}
                       className="flex-1 min-w-0 px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                     />
                     <button
@@ -723,7 +590,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
               {table.rows.map((row, rowIdx) => (
                 <div key={`${table.id}-row-${rowIdx}`} className="flex gap-2">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 flex-1 min-w-0">
-                    {table.headers.map((_, colIdx) => (
+                    {table.headers.map((header, colIdx) => (
                       <input
                         key={`${table.id}-cell-${rowIdx}-${colIdx}`}
                         value={row[colIdx] ?? ''}
@@ -737,6 +604,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                             ),
                           }))
                         }
+                        aria-label={`Row ${rowIdx + 1}, ${header || `column ${colIdx + 1}`}`}
                         className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                       />
                     ))}
@@ -776,8 +644,9 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
 
       {!v.gstApplicable && (
         <div className="bg-white border rounded-xl p-4 sm:p-5">
-          <label className="block text-xs font-medium text-slate-600 mb-1">GST declaration note</label>
+          <label htmlFor="invoice-gst-note" className={labelCls}>GST declaration note</label>
           <textarea
+            id="invoice-gst-note"
             rows={3}
             value={v.gstNote}
             onChange={(e) => setV((p) => ({ ...p, gstNote: e.target.value }))}
@@ -787,8 +656,9 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
       )}
 
       <div className="bg-white border rounded-xl p-4 sm:p-5">
-        <label className="block text-xs font-medium text-slate-600 mb-1">Notes (visible on invoice)</label>
+        <label htmlFor="invoice-notes" className={labelCls}>Notes (visible on invoice)</label>
         <textarea
+          id="invoice-notes"
           rows={2}
           value={v.notes}
           onChange={(e) => setV((p) => ({ ...p, notes: e.target.value }))}

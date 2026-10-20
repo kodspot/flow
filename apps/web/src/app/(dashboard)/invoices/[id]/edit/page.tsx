@@ -1,37 +1,22 @@
 'use client';
+import { useMemo } from 'react';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
+import { InvoiceForm } from '@/components/InvoiceForm';
+import { LoadError } from '@/components/LoadError';
 import {
-  InvoiceForm,
   invoiceToFormValues,
-  emptyInvoiceForm,
   type InvoicePayload,
-} from '@/components/InvoiceForm';
+  type InvoiceSource,
+  type InvoiceSourceItem,
+} from '@/lib/invoiceForm';
 
-interface InvoiceItem {
-  id: string;
-  description: string;
-  period: string | null;
-  rateLabel: string | null;
-  ratePaise: number | null;
-  days: number | null;
-  quantity: number | null;
-  amountPaise: number;
-}
-interface Invoice {
+interface Invoice extends InvoiceSource {
   invoiceNumber: string;
   status: string;
-  clientId: string;
-  invoiceDate: number;
-  placeOfSupply: string | null;
-  gstApplicable: boolean;
-  gstRatePercent: number;
-  gstNote: string | null;
-  notes: string | null;
-  internalNotes: string | null;
 }
 
 export default function EditInvoicePage() {
@@ -39,9 +24,9 @@ export default function EditInvoicePage() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['invoice', id],
-    queryFn: () => api<{ invoice: Invoice; items: InvoiceItem[] }>(`/v1/invoices/${id}`),
+    queryFn: () => api<{ invoice: Invoice; items: InvoiceSourceItem[] }>(`/v1/invoices/${id}`),
   });
 
   const m = useMutation({
@@ -60,7 +45,16 @@ export default function EditInvoicePage() {
     onError: (e) => toast.error((e as Error).message),
   });
 
-  if (isLoading || !data) {
+  // Built once per loaded invoice; the form reads it only on mount, so refetches never wipe edits.
+  const initial = useMemo(
+    () => (data ? invoiceToFormValues(data.invoice, data.items) : null),
+    [data],
+  );
+
+  if (error && !data) {
+    return <LoadError title="Couldn't load this invoice" error={error} onRetry={() => refetch()} />;
+  }
+  if (isLoading || !data || !initial) {
     return <div className="text-slate-500">Loading invoice…</div>;
   }
 
@@ -70,19 +64,25 @@ export default function EditInvoicePage() {
         <h1 className="text-xl font-bold text-kodspot">{data.invoice.invoiceNumber}</h1>
         <p className="text-sm text-slate-600">
           This invoice has status <b>{data.invoice.status}</b> and can no longer be edited.
-          To make changes, first revert it to <b>draft</b> from the invoice page.
+          To make changes, first revert it to <b>draft</b> from the invoice page, or create a copy.
         </p>
-        <Link
-          href={`/invoices/${id}`}
-          className="inline-block text-sm font-semibold text-kodspot hover:underline"
-        >
-          ← Back to invoice
-        </Link>
+        <div className="flex flex-wrap gap-4">
+          <Link
+            href={`/invoices/${id}`}
+            className="inline-block text-sm font-semibold text-kodspot hover:underline"
+          >
+            ← Back to invoice
+          </Link>
+          <Link
+            href={`/invoices/${id}/copy`}
+            className="inline-block text-sm font-semibold text-kodspot hover:underline"
+          >
+            Create a copy
+          </Link>
+        </div>
       </div>
     );
   }
-
-  const initial = data ? invoiceToFormValues(data.invoice, data.items) : emptyInvoiceForm();
 
   return (
     <InvoiceForm
@@ -99,8 +99,8 @@ export default function EditInvoicePage() {
         </Link>
       }
       onSubmit={(payload) => {
-        if (!payload.clientId) return toast.error('Select a client');
-        m.mutate(payload);
+        if (!payload.clientId) return void toast.error('Select a client');
+        return m.mutateAsync(payload);
       }}
     />
   );

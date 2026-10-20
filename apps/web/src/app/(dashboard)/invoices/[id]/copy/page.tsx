@@ -1,16 +1,16 @@
 'use client';
-import { useMemo, useState } from 'react';
-import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
-import { useParams, useRouter } from 'next/navigation';
+import { useMemo } from 'react';
+import { useQuery } from '@tanstack/react-query';
+import { useParams } from 'next/navigation';
 import Link from 'next/link';
 import { api } from '@/lib/api';
 import { toast } from 'sonner';
 import { InvoiceForm } from '@/components/InvoiceForm';
 import { LoadError } from '@/components/LoadError';
+import { CreateConflictNotice } from '@/components/CreateConflictNotice';
+import { useCreateInvoice } from '@/lib/useCreateInvoice';
 import {
   invoiceToCopyFormValues,
-  newIdempotencyKey,
-  type InvoicePayload,
   type InvoiceSource,
   type InvoiceSourceItem,
 } from '@/lib/invoiceForm';
@@ -27,10 +27,8 @@ interface Invoice extends InvoiceSource {
  */
 export default function CopyInvoicePage() {
   const { id } = useParams<{ id: string }>();
-  const router = useRouter();
-  const qc = useQueryClient();
   // One key per visit: repeated taps and retries create one copy; opening Copy again creates another.
-  const [idempotencyKey] = useState(newIdempotencyKey);
+  const create = useCreateInvoice();
 
   const source = useQuery({
     queryKey: ['invoice', id],
@@ -46,21 +44,6 @@ export default function CopyInvoicePage() {
     const active = new Set(clients.data.clients.map((c) => c.id));
     return invoiceToCopyFormValues(source.data.invoice, source.data.items, active);
   }, [source.data, clients.data]);
-
-  const m = useMutation({
-    mutationFn: (payload: InvoicePayload) =>
-      api<{ id: string; invoiceNumber: string }>('/v1/invoices', {
-        method: 'POST',
-        body: JSON.stringify({ ...payload, idempotencyKey }),
-      }),
-    onSuccess: (res) => {
-      toast.success(`Created ${res.invoiceNumber}`);
-      qc.invalidateQueries({ queryKey: ['invoices'] });
-      qc.invalidateQueries({ queryKey: ['dashboard'] });
-      router.push(`/invoices/${res.id}`);
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
 
   const loadError = (source.error && !source.data) || (clients.error && !clients.data);
   if (loadError) {
@@ -84,27 +67,36 @@ export default function CopyInvoicePage() {
       title={`New invoice from ${src.invoiceNumber}`}
       initial={copy.values}
       submitLabel="Create invoice"
-      submitting={m.isPending}
+      submitting={create.pending}
       reviewPeriods
       notice={
-        <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 space-y-1">
-          <p>
-            Copying <b className="font-mono">{src.invoiceNumber}</b> ({src.status}). Nothing is
-            saved until you press <b>Create invoice</b>. The original invoice stays unchanged.
-          </p>
-          <p>
-            This creates a separate <b>draft</b>, and a new invoice number is assigned when it is
-            saved. It is not sent automatically.
-          </p>
-          <p>
-            The invoice date is set to today. Review it and each item&apos;s period before saving.
-          </p>
-          {copy.clientMissing && (
-            <p className="text-amber-800 font-medium">
-              The original customer no longer exists. Choose a customer for this invoice.
-            </p>
+        <>
+          {create.conflict && (
+            <CreateConflictNotice
+              conflict={create.conflict}
+              busy={create.pending}
+              onCreateSeparate={create.createSeparate}
+            />
           )}
-        </div>
+          <div className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900 space-y-1">
+            <p>
+              Copying <b className="font-mono">{src.invoiceNumber}</b> ({src.status}). Nothing is
+              saved until you press <b>Create invoice</b>. The original invoice stays unchanged.
+            </p>
+            <p>
+              This creates a separate <b>draft</b>, and a new invoice number is assigned when it is
+              saved. It is not sent automatically.
+            </p>
+            <p>
+              The invoice date is set to today. Review it and each item&apos;s period before saving.
+            </p>
+            {copy.clientMissing && (
+              <p className="text-amber-800 font-medium">
+                The original customer no longer exists. Choose a customer for this invoice.
+              </p>
+            )}
+          </div>
+        </>
       }
       extraAction={
         <Link
@@ -116,7 +108,7 @@ export default function CopyInvoicePage() {
       }
       onSubmit={(payload) => {
         if (!payload.clientId) return void toast.error('Select a client');
-        return m.mutateAsync(payload);
+        return create.submit(payload);
       }}
     />
   );

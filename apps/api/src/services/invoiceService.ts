@@ -7,7 +7,7 @@ import type { InvoiceCreateInput, InvoiceUpdateInput } from '@kodspot/shared/sch
 import { formatInvoiceNumber } from './invoiceCounter.js';
 
 export interface CounterStub {
-  next(year: number): Promise<{ year: number; sequence: number }>;
+  next(year: number, idempotencyKey?: string): Promise<{ year: number; sequence: number }>;
 }
 
 export interface CreateInvoiceDeps {
@@ -22,11 +22,93 @@ function toDateMs(input: string | number): number {
   return d.getTime();
 }
 
-async function findByIdempotencyKey(db: DB, workspaceId: string, key: string) {
-  const existing = await db.query.invoices.findFirst({
+/**
+ * The idempotency key was already used to create an invoice with different details. Returned as
+ * 409 so a client never mistakes the earlier invoice for a save of its changed details.
+ */
+export class IdempotencyConflictError extends Error {
+  constructor(public readonly existing: { id: string; invoiceNumber: string }) {
+    super(
+      `An earlier attempt already created ${existing.invoiceNumber} with different details. ` +
+        'Your latest changes were not saved.',
+    );
+    this.name = 'IdempotencyConflictError';
+  }
+}
+
+type CompanyDefaults = Pick<
+  typeof s.companyProfiles.$inferSelect,
+  'defaultPlaceOfSupply' | 'defaultGstNote' | 'defaultInvoiceNotes'
+>;
+
+/** What a create request stores (invoice fields + items), with the same defaults as the insert. */
+function contentFromInput(input: InvoiceCreateInput, company: CompanyDefaults) {
+  return {
+    clientId: input.clientId,
+    invoiceDate: toDateMs(input.invoiceDate),
+    dueDate: input.dueDate ? toDateMs(input.dueDate) : null,
+    placeOfSupply: input.placeOfSupply ?? company.defaultPlaceOfSupply ?? null,
+    gstApplicable: input.gstApplicable,
+    gstRatePercent: input.gstApplicable ? Math.round(input.gstRatePercent * 100) : 0, // basis points x100
+    gstNote: input.gstNote ?? company.defaultGstNote ?? null,
+    notes: input.notes ?? company.defaultInvoiceNotes ?? null,
+    internalNotes: input.internalNotes ?? null,
+    items: input.items.map((it) => ({
+      description: it.description,
+      period: it.period ?? null,
+      rateLabel: it.rateLabel ?? null,
+      ratePaise: it.ratePaise ?? null,
+      days: it.days ?? null,
+      quantity: it.quantity ?? 1,
+      amountPaise: it.amountPaise,
+    })),
+  };
+}
+
+type InvoiceContent = ReturnType<typeof contentFromInput>;
+
+function findByIdempotencyKey(db: DB, workspaceId: string, key: string) {
+  return db.query.invoices.findFirst({
     where: and(eq(s.invoices.workspaceId, workspaceId), eq(s.invoices.idempotencyKey, key)),
   });
-  return existing ? { id: existing.id, invoiceNumber: existing.invoiceNumber } : null;
+}
+
+/**
+ * A request repeating the key of invoice `inv`. Same details: a retry, so `inv` is the answer.
+ * Different details: a conflict, never reported as a successful save of the new details.
+ */
+async function resolveIdempotentRepeat(
+  db: DB,
+  inv: typeof s.invoices.$inferSelect,
+  requested: InvoiceContent,
+): Promise<{ id: string; invoiceNumber: string }> {
+  const items = await db.query.invoiceItems.findMany({
+    where: eq(s.invoiceItems.invoiceId, inv.id),
+    orderBy: asc(s.invoiceItems.position),
+  });
+  const stored: InvoiceContent = {
+    clientId: inv.clientId,
+    invoiceDate: inv.invoiceDate,
+    dueDate: inv.dueDate,
+    placeOfSupply: inv.placeOfSupply,
+    gstApplicable: inv.gstApplicable,
+    gstRatePercent: inv.gstRatePercent,
+    gstNote: inv.gstNote,
+    notes: inv.notes,
+    internalNotes: inv.internalNotes,
+    items: items.map((it) => ({
+      description: it.description,
+      period: it.period,
+      rateLabel: it.rateLabel,
+      ratePaise: it.ratePaise,
+      days: it.days,
+      quantity: it.quantity,
+      amountPaise: it.amountPaise,
+    })),
+  };
+  const existing = { id: inv.id, invoiceNumber: inv.invoiceNumber };
+  if (JSON.stringify(stored) !== JSON.stringify(requested)) throw new IdempotencyConflictError(existing);
+  return existing;
 }
 
 export async function createInvoice(
@@ -34,17 +116,17 @@ export async function createInvoice(
   workspaceId: string,
   input: InvoiceCreateInput,
 ): Promise<{ id: string; invoiceNumber: string }> {
-  // Idempotency
-  if (input.idempotencyKey) {
-    const existing = await findByIdempotencyKey(db, workspaceId, input.idempotencyKey);
-    if (existing) return existing;
-  }
+  const key = input.idempotencyKey;
+  // Idempotency, first and cheap (as before): a repeat is answered before any other work.
+  const repeat = key ? await findByIdempotencyKey(db, workspaceId, key) : undefined;
 
   // Load company + client snapshot
   const company = await db.query.companyProfiles.findFirst({
     where: eq(s.companyProfiles.workspaceId, workspaceId),
   });
   if (!company) throw new Error('Company profile not configured');
+  const content = contentFromInput(input, company);
+  if (repeat) return resolveIdempotentRepeat(db, repeat, content);
 
   const client = await db.query.clients.findFirst({
     where: and(
@@ -56,22 +138,22 @@ export async function createInvoice(
   if (!client) throw new Error('Client not found');
 
   // Compute totals
-  const subtotal = input.items.reduce((sum, it) => sum + it.amountPaise, 0);
-  const gstRateBp = input.gstApplicable ? Math.round(input.gstRatePercent * 100) : 0; // basis points x100
-  const gstAmount = input.gstApplicable
+  const subtotal = content.items.reduce((sum, it) => sum + it.amountPaise, 0);
+  const gstRateBp = content.gstRatePercent;
+  const gstAmount = content.gstApplicable
     ? Math.round((subtotal * gstRateBp) / 10000)
     : 0;
   const total = subtotal + gstAmount;
 
-  // Allocate sequence number
-  const invoiceDateMs = toDateMs(input.invoiceDate);
+  // Allocate sequence number. Requests sharing an idempotency key get the same number from the
+  // counter, so duplicates racing past the check above don't use up extra numbers.
+  const invoiceDateMs = content.invoiceDate;
   const year = new Date(invoiceDateMs).getUTCFullYear();
-  const { sequence } = await counter.next(year);
+  const { sequence } = await counter.next(year, key);
   const invoiceNumber = formatInvoiceNumber(company.invoiceNumberPrefix, year, sequence);
 
   const id = nanoid(16);
   const now = Date.now();
-  const dueDateMs = input.dueDate ? toDateMs(input.dueDate) : null;
 
   const writes = [
     db.insert(s.invoices).values({
@@ -83,36 +165,30 @@ export async function createInvoice(
       sequenceYear: year,
       sequenceNumber: sequence,
       invoiceDate: invoiceDateMs,
-      dueDate: dueDateMs,
-      placeOfSupply: input.placeOfSupply ?? company.defaultPlaceOfSupply ?? null,
+      dueDate: content.dueDate,
+      placeOfSupply: content.placeOfSupply,
       status: 'draft',
       subtotalPaise: subtotal,
-      gstApplicable: input.gstApplicable,
+      gstApplicable: content.gstApplicable,
       gstRatePercent: gstRateBp,
       gstAmountPaise: gstAmount,
-      gstNote: input.gstNote ?? company.defaultGstNote ?? null,
+      gstNote: content.gstNote,
       totalPaise: total,
       paidPaise: 0,
       amountInWords: amountInWords(total),
-      notes: input.notes ?? company.defaultInvoiceNotes ?? null,
-      internalNotes: input.internalNotes ?? null,
+      notes: content.notes,
+      internalNotes: content.internalNotes,
       idempotencyKey: input.idempotencyKey ?? null,
       createdAt: now,
       updatedAt: now,
     }),
-    ...input.items.map((it, idx) =>
+    ...content.items.map((it, idx) =>
       db.insert(s.invoiceItems).values({
+        ...it,
         id: nanoid(16),
         invoiceId: id,
         workspaceId,
         position: idx,
-        description: it.description,
-        period: it.period ?? null,
-        rateLabel: it.rateLabel ?? null,
-        ratePaise: it.ratePaise ?? null,
-        days: it.days ?? null,
-        quantity: it.quantity ?? 1,
-        amountPaise: it.amountPaise,
         createdAt: now,
       }),
     ),
@@ -132,12 +208,10 @@ export async function createInvoice(
     await db.batch(writes);
   } catch (err) {
     // A concurrent request with the same key can pass the check above before the first one
-    // commits. The unique (workspace, idempotency_key) index rejects this batch atomically,
-    // so the invoice the first request created is the answer to this one too.
-    if (input.idempotencyKey) {
-      const existing = await findByIdempotencyKey(db, workspaceId, input.idempotencyKey);
-      if (existing) return existing;
-    }
+    // commits. It received the same number, so the unique indexes reject this batch atomically;
+    // the invoice the first request created answers this one too (or conflicts if details differ).
+    const winner = key ? await findByIdempotencyKey(db, workspaceId, key) : undefined;
+    if (winner) return resolveIdempotentRepeat(db, winner, content);
     throw err;
   }
 

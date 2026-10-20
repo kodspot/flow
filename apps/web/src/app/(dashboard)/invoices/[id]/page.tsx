@@ -111,6 +111,7 @@ export default function InvoiceDetailPage() {
 
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewLink, setPreviewLink] = useState<string | null>(null);
   const [pdfBusy, setPdfBusy] = useState(false);
   const pdfLock = useRef(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -118,19 +119,25 @@ export default function InvoiceDetailPage() {
 
   async function openPreview() {
     if (previewBusy) return;
+    setPreviewLink(null);
     // Open the tab within the tap itself: Safari blocks tabs opened after an await as pop-ups.
     const win = window.open('', '_blank');
     if (win) {
-      win.opener = null;
-      win.document.title = 'Loading invoice preview…';
-      win.document.body.textContent = 'Loading invoice preview…';
+      try {
+        win.opener = null;
+        win.document.title = 'Loading invoice preview…';
+        if (win.document.body) win.document.body.textContent = 'Loading invoice preview…';
+      } catch {
+        // Placeholder text only; the preview still loads below.
+      }
     }
     setPreviewBusy(true);
     try {
       const url = await fetchAssetBlobUrl(`/v1/invoices/${id}/preview`);
       setPreviewBlobUrl(url);
       if (win && !win.closed) win.location.replace(url);
-      else window.location.assign(url);
+      // Blocked or closed: stay in the app (a Home Screen app has no Back button) and offer a link.
+      else setPreviewLink(url);
     } catch (e) {
       win?.close();
       toast.error((e as Error).message);
@@ -308,6 +315,20 @@ export default function InvoiceDetailPage() {
           )}
         </div>
       </div>
+
+      {previewLink && (
+        <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <span>The preview couldn&apos;t open in a new tab automatically.</span>
+          <a
+            href={previewLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2.5 sm:py-2 rounded-md bg-kodspot text-white font-semibold hover:bg-kodspot-accent"
+          >
+            Open preview
+          </a>
+        </div>
+      )}
 
       <div className="bg-white border rounded-xl p-4 sm:p-6">
         <div className="grid grid-cols-2 gap-4 mb-6">

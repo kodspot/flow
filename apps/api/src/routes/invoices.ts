@@ -11,6 +11,7 @@ import {
   getDashboardStats,
   updateInvoice,
   softDeleteInvoice,
+  IdempotencyConflictError,
 } from '../services/invoiceService.js';
 import { renderInvoiceHtml } from '../services/invoiceRenderer.js';
 import { PdfService } from '../services/pdfService.js';
@@ -65,6 +66,9 @@ app.post('/', async (c) => {
     const result = await createInvoice({ db, counter }, workspaceId, parsed.data);
     return c.json(result, 201);
   } catch (e) {
+    if (e instanceof IdempotencyConflictError) {
+      return c.json({ error: e.message, code: 'idempotency_conflict', invoice: e.existing }, 409);
+    }
     return c.json({ error: (e as Error).message }, 400);
   }
 });

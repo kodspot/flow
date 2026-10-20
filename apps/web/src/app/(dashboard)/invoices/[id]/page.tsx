@@ -2,7 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { api, fetchAssetBlobUrl } from '@/lib/api';
 import { formatINRCompact } from '@kodspot/shared/money';
 import {
@@ -20,20 +20,26 @@ import {
   Send,
   CheckCircle2,
   Ban,
+  Copy,
 } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { LoadError } from '@/components/LoadError';
 
 interface InvoiceItem {
   id: string;
+  position: number;
   description: string;
   period: string | null;
   rateLabel: string | null;
+  ratePaise: number | null;
   days: number | null;
   quantity: number | null;
   amountPaise: number;
 }
 interface Invoice {
   invoiceNumber: string;
+  clientId: string;
+  clientSnapshot: string;
   invoiceDate: number;
   status: 'draft' | 'sent' | 'paid' | 'overdue' | 'cancelled';
   subtotalPaise: number;
@@ -55,10 +61,28 @@ export default function InvoiceDetailPage() {
   const router = useRouter();
   const qc = useQueryClient();
 
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['invoice', id],
     queryFn: () => api<{ invoice: Invoice; items: InvoiceItem[] }>(`/v1/invoices/${id}`),
   });
+
+  const { data: clientsData } = useQuery({
+    queryKey: ['clients'],
+    queryFn: () => api<{ clients: Array<{ id: string; name: string; company: string | null }> }>('/v1/clients'),
+  });
+
+  // Current customer record (as the list page shows it); falls back to the copy saved on the invoice.
+  const billedTo = useMemo(() => {
+    if (!data) return null;
+    const live = clientsData?.clients.find((c) => c.id === data.invoice.clientId);
+    if (live) return { name: live.name, company: live.company };
+    try {
+      const snap = JSON.parse(data.invoice.clientSnapshot) as { name?: string; company?: string | null };
+      return snap.name ? { name: snap.name, company: snap.company ?? null } : null;
+    } catch {
+      return null;
+    }
+  }, [data, clientsData]);
 
   const setStatus = useMutation({
     mutationFn: (status: Invoice['status']) =>
@@ -85,24 +109,37 @@ export default function InvoiceDetailPage() {
     onError: (e) => toast.error((e as Error).message),
   });
 
-  const generatePdf = useMutation({
-    mutationFn: () => api<{ pdfKey: string }>(`/v1/invoices/${id}/pdf`, { method: 'POST' }),
-    onSuccess: () => qc.invalidateQueries({ queryKey: ['invoice', id] }),
-    onError: (e) => toast.error((e as Error).message),
-  });
-
   const [previewBlobUrl, setPreviewBlobUrl] = useState<string | null>(null);
   const [previewBusy, setPreviewBusy] = useState(false);
+  const [previewLink, setPreviewLink] = useState<string | null>(null);
+  const [pdfBusy, setPdfBusy] = useState(false);
+  const pdfLock = useRef(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [confirmCancel, setConfirmCancel] = useState(false);
 
   async function openPreview() {
+    if (previewBusy) return;
+    setPreviewLink(null);
+    // Open the tab within the tap itself: Safari blocks tabs opened after an await as pop-ups.
+    const win = window.open('', '_blank');
+    if (win) {
+      try {
+        win.opener = null;
+        win.document.title = 'Loading invoice preview…';
+        if (win.document.body) win.document.body.textContent = 'Loading invoice preview…';
+      } catch {
+        // Placeholder text only; the preview still loads below.
+      }
+    }
     setPreviewBusy(true);
     try {
       const url = await fetchAssetBlobUrl(`/v1/invoices/${id}/preview`);
       setPreviewBlobUrl(url);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      if (win && !win.closed) win.location.replace(url);
+      // Blocked or closed: stay in the app (a Home Screen app has no Back button) and offer a link.
+      else setPreviewLink(url);
     } catch (e) {
+      win?.close();
       toast.error((e as Error).message);
     } finally {
       setPreviewBusy(false);
@@ -110,6 +147,10 @@ export default function InvoiceDetailPage() {
   }
 
   async function downloadPdf() {
+    // Each run regenerates the PDF, so ignore taps while one is in progress.
+    if (pdfLock.current) return;
+    pdfLock.current = true;
+    setPdfBusy(true);
     try {
       toast.message('Generating fresh PDF…');
       await api(`/v1/invoices/${id}/pdf`, { method: 'POST' });
@@ -124,13 +165,21 @@ export default function InvoiceDetailPage() {
       qc.invalidateQueries({ queryKey: ['invoice', id] });
     } catch (e) {
       toast.error((e as Error).message);
+    } finally {
+      pdfLock.current = false;
+      setPdfBusy(false);
     }
   }
 
   useEffect(() => () => { if (previewBlobUrl) URL.revokeObjectURL(previewBlobUrl); }, [previewBlobUrl]);
 
+  if (error && !data) {
+    return <LoadError title="Couldn't load this invoice" error={error} onRetry={() => refetch()} />;
+  }
   if (isLoading || !data) return <div className="text-slate-500">Loading…</div>;
-  const { invoice, items } = data;
+  const { invoice } = data;
+  // Column values in the table metadata are matched to items by position.
+  const items = [...data.items].sort((a, b) => a.position - b.position);
   const tableMeta = parseInvoiceInternalNotes(invoice.internalNotes).tableMeta;
   const visibleColumns = tableMeta.columns.filter((c) => c.enabled);
   const showSno = visibleColumns.some((c) => c.key === 'sno');
@@ -145,7 +194,10 @@ export default function InvoiceDetailPage() {
     if (key === 'sno') return String(rowIndex + 1);
     if (key === 'description') return item.description;
     if (key === 'period') return item.period ?? '—';
-    if (key === 'rateLabel') return item.rateLabel ?? '—';
+    // Same fallback as the PDF: the printed rate text, else the rate amount.
+    if (key === 'rateLabel') {
+      return item.rateLabel ?? (item.ratePaise != null ? formatINRCompact(item.ratePaise) : '—');
+    }
     if (key === 'days') {
       return rowValues[INVOICE_RESERVED_ROW_VALUE_KEYS.daysDisplay] ||
         (item.days != null ? String(item.days) : '—');
@@ -172,6 +224,13 @@ export default function InvoiceDetailPage() {
       <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
         <div>
           <h1 className="text-xl sm:text-2xl font-bold font-mono text-kodspot">{invoice.invoiceNumber}</h1>
+          {billedTo && (
+            <p className="text-sm text-slate-700 mt-1 break-words">
+              <span className="text-slate-500">Billed to </span>
+              <span className="font-semibold">{billedTo.name}</span>
+              {billedTo.company && <span className="text-slate-500"> · {billedTo.company}</span>}
+            </p>
+          )}
           <p className="text-sm text-slate-500 mt-1 flex items-center gap-2 flex-wrap">
             <span>{new Date(invoice.invoiceDate).toLocaleDateString('en-IN')}</span>
             <span className={`px-2 py-0.5 rounded text-xs font-semibold ${STATUS_COLOR[invoice.status]}`}>
@@ -197,11 +256,18 @@ export default function InvoiceDetailPage() {
           </button>
           <button
             onClick={downloadPdf}
-            disabled={generatePdf.isPending}
+            disabled={pdfBusy}
+            aria-busy={pdfBusy}
             className="inline-flex items-center gap-2 px-3 py-2 rounded-md bg-kodspot text-white text-sm font-semibold disabled:opacity-50"
           >
-            <Download className="size-4" /> Download PDF
+            <Download className="size-4" /> {pdfBusy ? 'Preparing PDF…' : 'Download PDF'}
           </button>
+          <Link
+            href={`/invoices/${id}/copy`}
+            className="inline-flex items-center gap-2 px-3 py-2 rounded-md border text-sm font-semibold text-slate-700 hover:bg-slate-50"
+          >
+            <Copy className="size-4" /> Create a copy
+          </Link>
           {isDraft && (
             <button
               onClick={() => setStatus.mutate('sent')}
@@ -249,6 +315,20 @@ export default function InvoiceDetailPage() {
           )}
         </div>
       </div>
+
+      {previewLink && (
+        <div role="status" className="flex flex-wrap items-center gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">
+          <span>The preview couldn&apos;t open in a new tab automatically.</span>
+          <a
+            href={previewLink}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="px-4 py-2.5 sm:py-2 rounded-md bg-kodspot text-white font-semibold hover:bg-kodspot-accent"
+          >
+            Open preview
+          </a>
+        </div>
+      )}
 
       <div className="bg-white border rounded-xl p-4 sm:p-6">
         <div className="grid grid-cols-2 gap-4 mb-6">

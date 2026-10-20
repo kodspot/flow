@@ -1,38 +1,34 @@
 'use client';
-import { useMutation } from '@tanstack/react-query';
-import { useRouter } from 'next/navigation';
-import { api } from '@/lib/api';
+import { useState } from 'react';
 import { toast } from 'sonner';
-import {
-  InvoiceForm,
-  emptyInvoiceForm,
-  type InvoicePayload,
-} from '@/components/InvoiceForm';
+import { InvoiceForm } from '@/components/InvoiceForm';
+import { CreateConflictNotice } from '@/components/CreateConflictNotice';
+import { emptyInvoiceForm } from '@/lib/invoiceForm';
+import { useCreateInvoice } from '@/lib/useCreateInvoice';
 
 export default function NewInvoicePage() {
-  const router = useRouter();
-  const m = useMutation({
-    mutationFn: (payload: InvoicePayload) =>
-      api<{ id: string; invoiceNumber: string }>('/v1/invoices', {
-        method: 'POST',
-        body: JSON.stringify(payload),
-      }),
-    onSuccess: (res) => {
-      toast.success(`Created ${res.invoiceNumber}`);
-      router.push(`/invoices/${res.id}`);
-    },
-    onError: (e) => toast.error((e as Error).message),
-  });
+  const [initial] = useState(emptyInvoiceForm);
+  // One key per visit: repeated taps and retries create at most one invoice.
+  const create = useCreateInvoice();
 
   return (
     <InvoiceForm
       title="New invoice"
-      initial={emptyInvoiceForm()}
+      initial={initial}
       submitLabel="Create invoice"
-      submitting={m.isPending}
+      submitting={create.pending}
+      notice={
+        create.conflict && (
+          <CreateConflictNotice
+            conflict={create.conflict}
+            busy={create.pending}
+            onCreateSeparate={create.createSeparate}
+          />
+        )
+      }
       onSubmit={(payload) => {
-        if (!payload.clientId) return toast.error('Select a client');
-        m.mutate(payload);
+        if (!payload.clientId) return void toast.error('Select a client');
+        return create.submit(payload);
       }}
     />
   );

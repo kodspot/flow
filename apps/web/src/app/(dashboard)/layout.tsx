@@ -4,6 +4,7 @@ import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api, clearToken, getToken } from '@/lib/api';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import {
   LayoutDashboard,
   FileText,
@@ -51,6 +52,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   useEffect(() => {
     setSidebarOpen(false);
   }, [pathname]);
+
+  useBodyScrollLock(sidebarOpen);
 
   const { data } = useQuery({
     queryKey: ['me'],
@@ -106,21 +109,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   );
 
   return (
-    <div className="min-h-screen flex bg-slate-50">
-      {/* Desktop sidebar */}
-      <aside className="hidden md:flex w-60 bg-kodspot text-white flex-col shrink-0">
+    <div className="min-h-viewport flex bg-slate-50">
+      {/* Desktop sidebar (lg+; tablets in portrait use the drawer so content keeps its width) */}
+      <aside className="hidden lg:flex w-60 bg-kodspot text-white flex-col shrink-0">
         {sidebarContent}
       </aside>
 
       {/* Mobile sidebar overlay */}
       {sidebarOpen && (
         <div
-          className="fixed inset-0 z-40 bg-black/50 md:hidden"
+          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
       <aside
-        className={`fixed inset-y-0 left-0 z-50 w-72 bg-kodspot text-white flex flex-col transition-transform duration-200 md:hidden ${
+        inert={!sidebarOpen}
+        aria-label="Navigation"
+        className={`fixed inset-y-0 left-0 z-50 w-72 max-w-[85vw] bg-kodspot text-white flex flex-col pt-safe pb-safe pl-safe transition-transform duration-200 lg:hidden ${
           sidebarOpen ? 'translate-x-0' : '-translate-x-full'
         }`}
       >
@@ -133,7 +138,8 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
           <button
             onClick={() => setSidebarOpen(false)}
-            className="p-1.5 rounded-md hover:bg-white/10 text-white/70"
+            aria-label="Close menu"
+            className="p-3 -m-1.5 rounded-md hover:bg-white/10 text-white/70"
           >
             <X className="size-5" />
           </button>
@@ -172,17 +178,23 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Content area */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Mobile top header */}
-        <header className="md:hidden flex items-center gap-3 px-4 py-3 bg-white border-b sticky top-0 z-30">
-          <button
-            onClick={() => setSidebarOpen(true)}
-            className="p-1.5 rounded-md text-slate-600 hover:bg-slate-100"
-          >
-            <Menu className="size-5" />
-          </button>
-          <span className="font-bold text-kodspot">Kodspot Flow</span>
+        <header className="lg:hidden bg-white border-b sticky top-0 z-30 pt-safe px-safe">
+          <div className="flex items-center gap-3 px-4 py-3">
+            <button
+              onClick={() => setSidebarOpen(true)}
+              aria-label="Open menu"
+              aria-expanded={sidebarOpen}
+              className="p-3 -mx-1.5 -my-1.5 rounded-md text-slate-600 hover:bg-slate-100"
+            >
+              <Menu className="size-5" />
+            </button>
+            <span className="font-bold text-kodspot">Kodspot Flow</span>
+          </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-8 overflow-auto">{children}</main>
+        <main className="flex-1 min-w-0 px-safe pb-safe">
+          <div className="p-4 md:p-8">{children}</div>
+        </main>
       </div>
     </div>
   );
@@ -225,13 +237,13 @@ function ProfileMenu({
           <Link
             href="/account"
             onClick={() => setOpen(false)}
-            className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200"
+            className="mt-3 w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 lg:py-1.5 rounded-md bg-slate-100 text-slate-700 text-xs font-semibold hover:bg-slate-200"
           >
             Account & security
           </Link>
           <button
             onClick={onSignOut}
-            className="mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-md bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
+            className="mt-2 w-full inline-flex items-center justify-center gap-2 px-3 py-2.5 lg:py-1.5 rounded-md bg-rose-600 text-white text-xs font-semibold hover:bg-rose-700"
           >
             <LogOut className="size-3.5" /> Sign out
           </button>

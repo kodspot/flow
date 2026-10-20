@@ -29,8 +29,8 @@ export default function SignupPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-6 bg-slate-50">
-      <form onSubmit={onSubmit} className="w-full max-w-sm bg-white p-8 rounded-xl shadow-sm border space-y-4">
+    <main className="min-h-viewport flex items-center justify-center px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] bg-slate-50">
+      <form onSubmit={onSubmit} className="w-full max-w-sm bg-white p-6 sm:p-8 rounded-xl shadow-sm border space-y-4">
         <div>
           <h1 className="text-2xl font-bold text-kodspot">Create workspace</h1>
           <p className="text-sm text-slate-500 mt-1">Start invoicing in 60 seconds</p>
@@ -43,7 +43,7 @@ export default function SignupPage() {
               type={k === 'password' ? 'password' : k === 'email' ? 'email' : 'text'}
               value={form[k]}
               onChange={(e) => setForm((f) => ({ ...f, [k]: e.target.value }))}
-              className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+              className="w-full px-3 py-2 border rounded-md text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
             />
           </div>
         ))}

@@ -143,6 +143,16 @@ Open http://localhost:3000 → sign up → create client → create invoice → 
 
 > **Browser Rendering doesn't work in `wrangler dev` locally** — for full PDF testing, deploy to a `--env=staging` worker or `wrangler dev --remote`.
 
+## 📱 Responsive / mobile conventions (`apps/web`)
+
+- **Breakpoints:** phones < `sm` (640px) get stacked cards instead of tables; the fixed sidebar appears from `lg` (1024px). Below that (phones, tablets in portrait, phone landscape) navigation is the drawer behind the top-bar menu button.
+- **Form controls are 16px on phones.** iOS Safari zooms the page whenever a focused input/select/textarea is under 16px and doesn't zoom back. Style controls with `text-base sm:text-sm` (never plain `text-sm`/`text-xs`); a `(pointer: coarse)` rule in `globals.css` also keeps them at 16px on touch devices wider than `sm` (phone landscape, tablets).
+- **No horizontal page overflow.** `<main>` doesn't clip or scroll; wide tables wrap themselves in `overflow-x-auto`. Give `flex-1` inputs `min-w-0`, and use `sm:col-span-2` (not `col-span-2`) inside `grid-cols-1 sm:grid-cols-2`.
+- **Viewport height:** use `min-h-viewport` (100dvh with a 100vh fallback, defined in `globals.css`), not `min-h-screen`, so iOS toolbars don't push content off-screen. Overlays scroll (`fixed inset-0 flex overflow-y-auto` + `m-auto` on the panel) rather than using `max-h-[90vh]`.
+- **Safe areas:** the viewport uses `viewport-fit=cover` (needed for the installed PWA's translucent status bar), so shells must pad for insets: `pt-safe` / `pb-safe` / `pl-safe` / `pr-safe` / `px-safe`, or `pt-[max(2rem,env(safe-area-inset-top))]` when a minimum is needed.
+- **Pinch-zoom stays enabled** (`maximumScale: 5`). Don't add `user-scalable=no` or shrink fonts globally to make things fit.
+- **Manual check:** before shipping UI changes, try 320, 390, 440×956 (iPhone Pro Max) and 956×440 landscape, 768/820 (iPad portrait) and 1440 in DevTools. Focus-zoom, safe areas and the on-screen keyboard only reproduce on a real iPhone (Safari and Add to Home Screen).
+
 ## 🌐 Production deploy
 
 ```powershell
@@ -189,5 +199,5 @@ npx wrangler pages deploy .open-next/dist --project-name=kodspot-flow-web
 - [ ] **Phase 2**: Resend email + WhatsApp delivery (queues)
 - [ ] **Phase 3**: Recurring profiles + cron generation
 - [ ] **Phase 4**: Payments tracking + reminders
-- [ ] **Phase 5**: Charts, command palette, dark mode, mobile polish
+- [ ] **Phase 5**: Charts, command palette, dark mode, mobile polish (responsive pass done — see conventions above)
 - [ ] **Phase 6**: Public API, webhooks, multi-user invites

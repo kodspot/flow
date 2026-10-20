@@ -395,7 +395,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
         </div>
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-white border rounded-xl p-5">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 bg-white border rounded-xl p-4 sm:p-5">
         <div>
           <label className="block text-xs font-medium text-slate-600 mb-1">Client *</label>
           <select
@@ -403,7 +403,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
             value={v.clientId}
             onChange={(e) => setV((p) => ({ ...p, clientId: e.target.value }))}
             disabled={clientsLoading}
-            className="w-full px-3 py-2 border rounded-md text-sm"
+            className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
           >
             <option value="">{clientsLoading ? 'Loading clients...' : 'Select client...'}</option>
             {clientData?.clients.map((c) => (
@@ -421,7 +421,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
             required
             value={v.invoiceDate}
             onChange={(e) => setV((p) => ({ ...p, invoiceDate: e.target.value }))}
-            className="w-full px-3 py-2 border rounded-md text-sm"
+            className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
           />
         </div>
         <div>
@@ -429,18 +429,18 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
           <input
             value={v.placeOfSupply}
             onChange={(e) => setV((p) => ({ ...p, placeOfSupply: e.target.value }))}
-            className="w-full px-3 py-2 border rounded-md text-sm"
+            className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
           />
         </div>
       </div>
 
-      <div className="bg-white border rounded-xl p-5 space-y-4">
+      <div className="bg-white border rounded-xl p-4 sm:p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Line-item Columns</h2>
           <button
             type="button"
             onClick={addCustomColumn}
-            className="inline-flex items-center gap-1 text-sm text-kodspot font-semibold"
+            className="inline-flex items-center gap-1 py-2 -my-2 text-sm text-kodspot font-semibold"
           >
             <Plus className="size-4" /> Add custom column
           </button>
@@ -450,13 +450,13 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
           {v.columns.map((col, idx) => {
             const locked = col.key === 'description' || col.key === 'amount';
             return (
-              <div key={col.key} className="grid grid-cols-1 sm:grid-cols-[1fr_auto_auto] gap-2 items-center p-3 border rounded-md bg-slate-50">
+              <div key={col.key} className="grid grid-cols-1 sm:grid-cols-[minmax(0,1fr)_auto_auto] gap-2 items-center p-3 border rounded-md bg-slate-50">
                 <div>
                   <label className="block text-xs font-medium text-slate-600 mb-1">Header label</label>
                   <input
                     value={col.label}
                     onChange={(e) => updateColumn(idx, { label: e.target.value })}
-                    className="w-full px-3 py-2 border rounded-md text-sm bg-white"
+                    className="w-full px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                   />
                   <div className="text-[11px] text-slate-500 mt-1">{col.key}</div>
                 </div>
@@ -486,13 +486,13 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
         </div>
       </div>
 
-      <div className="bg-white border rounded-xl p-5">
+      <div className="bg-white border rounded-xl p-4 sm:p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="font-semibold">Items</h2>
           <button
             type="button"
             onClick={() => setV((p) => ({ ...p, items: [...p.items, blankItem()] }))}
-            className="inline-flex items-center gap-1 text-sm text-kodspot font-semibold"
+            className="inline-flex items-center gap-1 py-2 -my-2 text-sm text-kodspot font-semibold"
           >
             <Plus className="size-4" /> Add item
           </button>
@@ -507,13 +507,14 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                   required
                   value={it.description}
                   onChange={(e) => setItem(i, { description: e.target.value })}
-                  className="flex-1 px-3 py-2 border rounded-md text-sm bg-white"
+                  className="flex-1 min-w-0 px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                 />
                 <button
                   type="button"
                   onClick={() => setV((p) => ({ ...p, items: p.items.filter((_, idx) => idx !== i) }))}
                   disabled={v.items.length === 1}
-                  className="shrink-0 p-2 text-rose-600 hover:bg-rose-100 rounded disabled:opacity-30"
+                  aria-label="Remove item"
+                  className="shrink-0 p-3 sm:p-2 text-rose-600 hover:bg-rose-100 rounded disabled:opacity-30"
                   title={v.items.length === 1 ? 'At least one item required' : 'Remove item'}
                 >
                   <Trash2 className="size-4" />
@@ -525,13 +526,13 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                   placeholder="Period"
                   value={it.period}
                   onChange={(e) => setItem(i, { period: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-sm bg-white"
+                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                 />
                 <input
                   placeholder="Rate label"
                   value={it.rateLabel}
                   onChange={(e) => setItem(i, { rateLabel: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-sm bg-white"
+                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                 />
                 <input
                   type="number"
@@ -540,21 +541,21 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                   placeholder="Rate Rs"
                   value={it.rateRupees}
                   onChange={(e) => setItem(i, { rateRupees: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-sm bg-white"
+                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                 />
                 <input
                   type="text"
                   placeholder="Days (e.g. 10 or 10 days)"
                   value={it.days}
                   onChange={(e) => setItem(i, { days: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-sm bg-white"
+                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                 />
                 <input
                   type="text"
                   placeholder="Quantity (e.g. 10 nos)"
                   value={it.quantity}
                   onChange={(e) => setItem(i, { quantity: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-sm bg-white"
+                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                 />
                 <input
                   type="number"
@@ -564,7 +565,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                   required
                   value={it.amountRupees}
                   onChange={(e) => setItem(i, { amountRupees: e.target.value })}
-                  className="px-3 py-2 border rounded-md text-sm bg-white"
+                  className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                 />
               </div>
 
@@ -576,7 +577,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                       placeholder={col.label || 'Custom value'}
                       value={it.customValues[col.key] ?? ''}
                       onChange={(e) => setItemCustomValue(i, col.key, e.target.value)}
-                      className="px-3 py-2 border rounded-md text-sm bg-white"
+                      className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                     />
                   ))}
                 </div>
@@ -612,7 +613,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                       gstRatePercent: clampNonNegativeNumber(e.target.value, 0),
                     }))
                   }
-                  className="w-20 px-2 py-1 border rounded text-xs text-right"
+                  className="w-20 px-2 py-1 border rounded text-base sm:text-xs text-right"
                 />
               )}
               <span>{formatINRCompact(rupeesToPaise(gstAmount))}</span>
@@ -625,13 +626,13 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
         </div>
       </div>
 
-      <div className="bg-white border rounded-xl p-5 space-y-4">
+      <div className="bg-white border rounded-xl p-4 sm:p-5 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <h2 className="font-semibold">Additional Tables</h2>
           <button
             type="button"
             onClick={addExtraTable}
-            className="inline-flex items-center gap-1 text-sm text-kodspot font-semibold"
+            className="inline-flex items-center gap-1 py-2 -my-2 text-sm text-kodspot font-semibold"
           >
             <Plus className="size-4" /> Add table
           </button>
@@ -655,7 +656,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                   }))
                 }
                 placeholder="Table title"
-                className="flex-1 px-3 py-2 border rounded-md text-sm bg-white"
+                className="flex-1 px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
               />
               <button
                 type="button"
@@ -679,7 +680,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                           headers: t.headers.map((h, idx) => (idx === headerIdx ? e.target.value : h)),
                         }))
                       }
-                      className="flex-1 px-3 py-2 border rounded-md text-sm bg-white"
+                      className="flex-1 min-w-0 px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                     />
                     <button
                       type="button"
@@ -692,8 +693,9 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                         })
                       }
                       disabled={table.headers.length <= 1}
-                      className="px-2 rounded-md border text-rose-600 disabled:opacity-30"
+                      className="shrink-0 px-3 sm:px-2 rounded-md border text-rose-600 disabled:opacity-30"
                       title="Remove column"
+                      aria-label="Remove column"
                     >
                       <Trash2 className="size-4" />
                     </button>
@@ -710,7 +712,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                     return { ...t, headers: nextHeaders, rows };
                   })
                 }
-                className="inline-flex items-center gap-1 text-xs text-kodspot font-semibold"
+                className="inline-flex items-center gap-1 py-2 sm:py-0 text-xs text-kodspot font-semibold"
               >
                 <Plus className="size-3" /> Add header
               </button>
@@ -720,7 +722,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
               <div className="text-xs font-semibold text-slate-600">Rows</div>
               {table.rows.map((row, rowIdx) => (
                 <div key={`${table.id}-row-${rowIdx}`} className="flex gap-2">
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 flex-1">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 flex-1 min-w-0">
                     {table.headers.map((_, colIdx) => (
                       <input
                         key={`${table.id}-cell-${rowIdx}-${colIdx}`}
@@ -735,7 +737,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                             ),
                           }))
                         }
-                        className="px-3 py-2 border rounded-md text-sm bg-white"
+                        className="px-3 py-2 border rounded-md text-base sm:text-sm bg-white"
                       />
                     ))}
                   </div>
@@ -747,8 +749,9 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                         rows: t.rows.filter((_, idx) => idx !== rowIdx),
                       }))
                     }
-                    className="px-2 rounded-md border text-rose-600 hover:bg-rose-50"
+                    className="shrink-0 px-3 sm:px-2 rounded-md border text-rose-600 hover:bg-rose-50"
                     title="Remove row"
+                    aria-label="Remove row"
                   >
                     <Trash2 className="size-4" />
                   </button>
@@ -762,7 +765,7 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
                     rows: [...t.rows, t.headers.map(() => '')],
                   }))
                 }
-                className="inline-flex items-center gap-1 text-xs text-kodspot font-semibold"
+                className="inline-flex items-center gap-1 py-2 sm:py-0 text-xs text-kodspot font-semibold"
               >
                 <Plus className="size-3" /> Add row
               </button>
@@ -772,24 +775,24 @@ export function InvoiceForm({ initial, submitLabel, submitting, onSubmit, extraA
       </div>
 
       {!v.gstApplicable && (
-        <div className="bg-white border rounded-xl p-5">
+        <div className="bg-white border rounded-xl p-4 sm:p-5">
           <label className="block text-xs font-medium text-slate-600 mb-1">GST declaration note</label>
           <textarea
             rows={3}
             value={v.gstNote}
             onChange={(e) => setV((p) => ({ ...p, gstNote: e.target.value }))}
-            className="w-full px-3 py-2 border rounded-md text-sm"
+            className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
           />
         </div>
       )}
 
-      <div className="bg-white border rounded-xl p-5">
+      <div className="bg-white border rounded-xl p-4 sm:p-5">
         <label className="block text-xs font-medium text-slate-600 mb-1">Notes (visible on invoice)</label>
         <textarea
           rows={2}
           value={v.notes}
           onChange={(e) => setV((p) => ({ ...p, notes: e.target.value }))}
-          className="w-full px-3 py-2 border rounded-md text-sm"
+          className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
         />
       </div>
     </form>

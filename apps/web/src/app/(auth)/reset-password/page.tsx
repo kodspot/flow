@@ -48,7 +48,7 @@ function ResetPasswordForm() {
 
   if (!token) {
     return (
-      <main className="min-h-screen flex items-center justify-center px-4 bg-slate-50">
+      <main className="min-h-viewport flex items-center justify-center px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] bg-slate-50">
         <div className="w-full max-w-sm bg-white p-6 sm:p-8 rounded-xl shadow-sm border space-y-3 text-center">
           <h1 className="text-xl font-bold text-kodspot">Invalid link</h1>
           <p className="text-sm text-slate-500">
@@ -66,7 +66,7 @@ function ResetPasswordForm() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 bg-slate-50">
+    <main className="min-h-viewport flex items-center justify-center px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] bg-slate-50">
       <form onSubmit={onSubmit} className="w-full max-w-sm bg-white p-6 sm:p-8 rounded-xl shadow-sm border space-y-5">
         <div>
           <h1 className="text-2xl font-bold text-kodspot">Reset password</h1>
@@ -81,7 +81,7 @@ function ResetPasswordForm() {
             autoFocus
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+            className="w-full px-3 py-2 border rounded-md text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
           />
           <p className="text-xs text-slate-400">At least 8 characters.</p>
         </div>
@@ -93,7 +93,7 @@ function ResetPasswordForm() {
             minLength={8}
             value={confirm}
             onChange={(e) => setConfirm(e.target.value)}
-            className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+            className="w-full px-3 py-2 border rounded-md text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
           />
         </div>
         <button

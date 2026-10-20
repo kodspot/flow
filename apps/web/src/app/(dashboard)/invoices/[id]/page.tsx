@@ -133,6 +133,10 @@ export default function InvoiceDetailPage() {
   const { invoice, items } = data;
   const tableMeta = parseInvoiceInternalNotes(invoice.internalNotes).tableMeta;
   const visibleColumns = tableMeta.columns.filter((c) => c.enabled);
+  const showSno = visibleColumns.some((c) => c.key === 'sno');
+  const detailColumns = visibleColumns.filter(
+    (c) => c.key !== 'sno' && c.key !== 'description' && c.key !== 'amount',
+  );
   const isDraft = invoice.status === 'draft';
   const isSentOrOverdue = invoice.status === 'sent' || invoice.status === 'overdue';
 
@@ -257,7 +261,32 @@ export default function InvoiceDetailPage() {
             <div className="text-xl font-bold text-kodspot">{formatINRCompact(invoice.totalPaise)}</div>
           </div>
         </div>
-        <div className="overflow-x-auto">
+        {/* Mobile: stacked items so the amount is always visible */}
+        <ul className="sm:hidden border-t divide-y text-sm">
+          {items.map((it, rowIndex) => (
+            <li key={it.id} className="py-3">
+              <div className="flex items-start justify-between gap-3">
+                <div className="min-w-0 font-medium break-words">
+                  {showSno && <span className="text-slate-400 mr-1.5">{rowIndex + 1}.</span>}
+                  {it.description}
+                </div>
+                <div className="shrink-0 font-semibold">{formatINRCompact(it.amountPaise)}</div>
+              </div>
+              {detailColumns.length > 0 && (
+                <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-1 text-xs">
+                  {detailColumns.map((col) => (
+                    <div key={`${it.id}-${col.key}`} className="min-w-0 break-words">
+                      <dt className="inline text-slate-500">{col.label}: </dt>
+                      <dd className="inline text-slate-700">{getCellValue(it, rowIndex, col.key)}</dd>
+                    </div>
+                  ))}
+                </dl>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <div className="hidden sm:block overflow-x-auto">
           <table className="w-full text-sm min-w-[480px]">
             <thead className="bg-slate-50 text-xs uppercase">
               <tr>

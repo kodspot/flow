@@ -83,22 +83,25 @@ export default function InvoicesPage() {
         </Link>
       </div>
 
-      <div className="flex flex-col sm:flex-row gap-3 sm:items-center">
-        <div className="relative flex-1 max-w-sm">
+      <div className="flex flex-col lg:flex-row gap-3 lg:items-center">
+        <div className="relative w-full sm:max-w-sm lg:flex-1">
           <Search className="size-4 absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
           <input
+            type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Search by invoice # or client…"
-            className="w-full pl-9 pr-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+            aria-label="Search invoices"
+            className="w-full pl-9 pr-3 py-2 border rounded-md text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
           />
         </div>
-        <div className="flex gap-1 flex-wrap">
+        <div className="flex gap-1.5 sm:gap-1 flex-wrap">
           {STATUS_FILTERS.map((f) => (
             <button
               key={f.value}
               onClick={() => setStatusFilter(f.value)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold border transition ${
+              aria-pressed={statusFilter === f.value}
+              className={`px-3 py-2.5 sm:py-1.5 rounded-md text-xs font-semibold border transition ${
                 statusFilter === f.value
                   ? 'bg-kodspot text-white border-kodspot'
                   : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'

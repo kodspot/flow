@@ -5,6 +5,7 @@ import { useState } from 'react';
 import { toast } from 'sonner';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { ConfirmDialog } from '@/components/ConfirmDialog';
+import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 
 interface Client {
   id: string;
@@ -124,18 +125,20 @@ export default function ClientsPage() {
                 </div>
               )}
             </button>
-            <div className="flex flex-col gap-1 shrink-0">
+            <div className="flex flex-col shrink-0 -my-1.5 -mr-1.5">
               <button
                 onClick={() => setEditing(c)}
-                className="text-slate-500 hover:text-kodspot p-1.5 rounded hover:bg-slate-100"
+                className="text-slate-500 hover:text-kodspot p-3 rounded hover:bg-slate-100"
                 title="Edit"
+                aria-label={`Edit ${c.name}`}
               >
                 <Pencil className="size-4" />
               </button>
               <button
                 onClick={() => setDeleteTarget(c)}
-                className="text-rose-500 hover:text-rose-700 p-1.5 rounded hover:bg-rose-50"
+                className="text-rose-500 hover:text-rose-700 p-3 rounded hover:bg-rose-50"
                 title="Delete"
+                aria-label={`Delete ${c.name}`}
               >
                 <Trash2 className="size-4" />
               </button>
@@ -173,6 +176,7 @@ export default function ClientsPage() {
                         onClick={() => setEditing(c)}
                         className="text-slate-500 hover:text-kodspot p-1 rounded hover:bg-slate-100"
                         title="Edit"
+                        aria-label={`Edit ${c.name}`}
                       >
                         <Pencil className="size-4" />
                       </button>
@@ -180,6 +184,7 @@ export default function ClientsPage() {
                         onClick={() => setDeleteTarget(c)}
                         className="text-rose-600 hover:text-rose-700 p-1 rounded hover:bg-rose-50"
                         title="Delete"
+                        aria-label={`Delete ${c.name}`}
                       >
                         <Trash2 className="size-4" />
                       </button>
@@ -247,6 +252,7 @@ function ClientFormModal({
 }) {
   const qc = useQueryClient();
   const [form, setForm] = useState<ClientFormState>(initial);
+  useBodyScrollLock(true);
 
   const m = useMutation({
     mutationFn: () => {
@@ -286,7 +292,7 @@ function ClientFormModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4"
+      className="fixed inset-0 bg-black/50 flex overflow-y-auto overscroll-contain z-50 px-[max(1rem,env(safe-area-inset-left))] pt-[max(1rem,env(safe-area-inset-top))] pb-[max(1rem,env(safe-area-inset-bottom))]"
       onClick={onClose}
     >
       <form
@@ -296,7 +302,7 @@ function ClientFormModal({
           if (!form.name.trim()) return toast.error('Name is required');
           m.mutate();
         }}
-        className="bg-white rounded-xl p-5 sm:p-6 w-full max-w-2xl space-y-4 max-h-[90vh] overflow-auto shadow-xl"
+        className="m-auto bg-white rounded-xl p-5 sm:p-6 w-full max-w-2xl space-y-4 shadow-xl"
       >
         <h2 className="text-lg sm:text-xl font-bold">
           {mode === 'create' ? 'Add client' : 'Edit client'}
@@ -309,23 +315,23 @@ function ClientFormModal({
                 value={form[key]}
                 onChange={(e) => setForm((f) => ({ ...f, [key]: e.target.value }))}
                 required={key === 'name'}
-                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+                className="w-full px-3 py-2 border rounded-md text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
               />
             </div>
           ))}
         </div>
-        <div className="flex gap-2 justify-end pt-2">
+        <div className="flex flex-wrap gap-2 justify-end pt-2">
           <button
             type="button"
             onClick={onClose}
-            className="px-4 py-2 rounded-md border text-sm font-semibold text-slate-700 hover:bg-slate-50"
+            className="px-4 py-2.5 sm:py-2 rounded-md border text-sm font-semibold text-slate-700 hover:bg-slate-50"
           >
             Cancel
           </button>
           <button
             type="submit"
             disabled={m.isPending}
-            className="px-4 py-2 rounded-md bg-kodspot text-white text-sm font-semibold hover:bg-kodspot-accent disabled:opacity-50"
+            className="px-4 py-2.5 sm:py-2 rounded-md bg-kodspot text-white text-sm font-semibold hover:bg-kodspot-accent disabled:opacity-50"
           >
             {m.isPending ? 'Saving…' : mode === 'create' ? 'Add client' : 'Save changes'}
           </button>

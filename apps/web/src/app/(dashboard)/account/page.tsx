@@ -69,7 +69,7 @@ export default function AccountPage() {
       </div>
 
       {/* Identity */}
-      <section className="bg-white border rounded-xl p-6 space-y-4">
+      <section className="bg-white border rounded-xl p-4 sm:p-6 space-y-4">
         <header className="flex items-center gap-3">
           <UserCircle className="size-5 text-kodspot" />
           <h2 className="font-semibold text-slate-800">Profile</h2>
@@ -81,7 +81,7 @@ export default function AccountPage() {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+              className="mt-1 w-full px-3 py-2 border rounded-md text-base sm:text-smfocus:outline-none focus:ring-2 focus:ring-kodspot/30"
             />
           </div>
           <div>
@@ -90,7 +90,7 @@ export default function AccountPage() {
               type="email"
               value={data.user.email}
               disabled
-              className="mt-1 w-full px-3 py-2 border rounded-md text-sm bg-slate-50 text-slate-500"
+              className="mt-1 w-full px-3 py-2 border rounded-md text-base sm:text-smbg-slate-50 text-slate-500"
             />
             <p className="text-xs text-slate-400 mt-1">
               Email changes are not supported yet — contact support to update.
@@ -102,7 +102,7 @@ export default function AccountPage() {
               type="text"
               value={data.user.role}
               disabled
-              className="mt-1 w-full px-3 py-2 border rounded-md text-sm bg-slate-50 text-slate-500 capitalize"
+              className="mt-1 w-full px-3 py-2 border rounded-md text-base sm:text-smbg-slate-50 text-slate-500 capitalize"
             />
           </div>
           <div>
@@ -111,7 +111,7 @@ export default function AccountPage() {
               type="text"
               value={`${data.workspace.name} · ${data.workspace.plan}`}
               disabled
-              className="mt-1 w-full px-3 py-2 border rounded-md text-sm bg-slate-50 text-slate-500 capitalize"
+              className="mt-1 w-full px-3 py-2 border rounded-md text-base sm:text-smbg-slate-50 text-slate-500 capitalize"
             />
           </div>
         </div>
@@ -127,7 +127,7 @@ export default function AccountPage() {
       </section>
 
       {/* Password */}
-      <section className="bg-white border rounded-xl p-6 space-y-4">
+      <section className="bg-white border rounded-xl p-4 sm:p-6 space-y-4">
         <header className="flex items-center gap-3">
           <KeyRound className="size-5 text-kodspot" />
           <h2 className="font-semibold text-slate-800">Change password</h2>
@@ -140,7 +140,7 @@ export default function AccountPage() {
               required
               value={currentPassword}
               onChange={(e) => setCurrentPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+              className="mt-1 w-full px-3 py-2 border rounded-md text-base sm:text-smfocus:outline-none focus:ring-2 focus:ring-kodspot/30"
             />
           </div>
           <div>
@@ -151,7 +151,7 @@ export default function AccountPage() {
               minLength={8}
               value={newPassword}
               onChange={(e) => setNewPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+              className="mt-1 w-full px-3 py-2 border rounded-md text-base sm:text-smfocus:outline-none focus:ring-2 focus:ring-kodspot/30"
             />
             <p className="text-xs text-slate-400 mt-1">At least 8 characters.</p>
           </div>
@@ -163,7 +163,7 @@ export default function AccountPage() {
               minLength={8}
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
-              className="mt-1 w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+              className="mt-1 w-full px-3 py-2 border rounded-md text-base sm:text-smfocus:outline-none focus:ring-2 focus:ring-kodspot/30"
             />
           </div>
           <div className="md:col-span-2 flex justify-end">
@@ -179,7 +179,7 @@ export default function AccountPage() {
       </section>
 
       {/* Security info */}
-      <section className="bg-white border rounded-xl p-6 space-y-3">
+      <section className="bg-white border rounded-xl p-4 sm:p-6 space-y-3">
         <header className="flex items-center gap-3">
           <ShieldCheck className="size-5 text-kodspot" />
           <h2 className="font-semibold text-slate-800">Security</h2>
@@ -192,7 +192,7 @@ export default function AccountPage() {
               : '—'}
           </dd>
           <dt className="text-slate-500">Account ID</dt>
-          <dd className="text-slate-800 font-mono text-xs">{data.user.id}</dd>
+          <dd className="text-slate-800 font-mono text-xs break-all">{data.user.id}</dd>
         </dl>
         <p className="text-xs text-slate-400">
           Changing your password does not invalidate existing sessions on other devices. Sign out

@@ -162,32 +162,32 @@ export default function SettingsPage() {
       />
 
       {GROUPS.map((group) => (
-        <fieldset key={group.title} className="bg-white border rounded-xl p-6">
+        <fieldset key={group.title} className="min-w-0 bg-white border rounded-xl p-4 sm:p-6">
           <legend className="px-2 text-sm font-semibold text-slate-700">{group.title}</legend>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             {group.fields.map(({ key, label, type }) => (
-              <div key={String(key)} className={type === 'textarea' ? 'col-span-2' : ''}>
+              <div key={String(key)} className={type === 'textarea' ? 'sm:col-span-2' : ''}>
                 <label className="block text-xs font-medium text-slate-600 mb-1">{label}</label>
                 {type === 'textarea' ? (
                   <textarea
                     rows={3}
                     value={(form[key] as string) ?? ''}
                     onChange={(e) => setField(key, e.target.value as Profile[typeof key])}
-                    className="w-full px-3 py-2 border rounded-md text-sm"
+                    className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
                   />
                 ) : type === 'number' ? (
                   <input
                     type="number"
                     value={(form[key] as number) ?? 0}
                     onChange={(e) => setField(key, Number(e.target.value) as Profile[typeof key])}
-                    className="w-full px-3 py-2 border rounded-md text-sm"
+                    className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
                   />
                 ) : (
                   <input
                     type="text"
                     value={(form[key] as string) ?? ''}
                     onChange={(e) => setField(key, e.target.value as Profile[typeof key])}
-                    className="w-full px-3 py-2 border rounded-md text-sm"
+                    className="w-full px-3 py-2 border rounded-md text-base sm:text-sm"
                   />
                 )}
               </div>
@@ -201,7 +201,7 @@ export default function SettingsPage() {
 
 function BrandingPanel({ logoKey, signatureKey }: { logoKey: string | null; signatureKey: string | null }) {
   return (
-    <div className="bg-white border rounded-xl p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
+    <div className="bg-white border rounded-xl p-4 sm:p-6 grid grid-cols-1 sm:grid-cols-2 gap-6">
       <AssetUploader kind="logo" label="Logo" assetKey={logoKey} hint="PNG/SVG, square recommended, max 2 MB" />
       <AssetUploader kind="signature" label="Signature" assetKey={signatureKey} hint="Transparent PNG preferred, max 2 MB" />
     </div>
@@ -264,14 +264,14 @@ function AssetUploader({
     <div>
       <label className="block text-xs font-medium text-slate-600 mb-2">{label}</label>
       <div className="flex items-center gap-4">
-        <div className="w-24 h-24 border rounded-md flex items-center justify-center bg-slate-50 overflow-hidden">
+        <div className="w-24 h-24 shrink-0 border rounded-md flex items-center justify-center bg-slate-50 overflow-hidden">
           {previewUrl ? (
             <img src={previewUrl} alt={label} className="max-w-full max-h-full object-contain" />
           ) : (
             <span className="text-xs text-slate-400">No {label.toLowerCase()}</span>
           )}
         </div>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-2 min-w-0">
           <input
             ref={inputRef}
             type="file"
@@ -287,7 +287,7 @@ function AssetUploader({
             type="button"
             onClick={() => inputRef.current?.click()}
             disabled={upload.isPending}
-            className="px-3 py-1.5 text-xs rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
+            className="px-3 py-2.5 sm:py-1.5 text-xs rounded-md border border-slate-300 hover:bg-slate-50 disabled:opacity-50"
           >
             {upload.isPending ? 'Uploading…' : assetKey ? 'Replace' : 'Upload'}
           </button>
@@ -296,7 +296,7 @@ function AssetUploader({
               type="button"
               onClick={() => remove.mutate()}
               disabled={remove.isPending}
-              className="px-3 py-1.5 text-xs rounded-md text-red-600 hover:bg-red-50 disabled:opacity-50"
+              className="px-3 py-2.5 sm:py-1.5 text-xs rounded-md text-red-600 hover:bg-red-50 disabled:opacity-50"
             >
               Remove
             </button>

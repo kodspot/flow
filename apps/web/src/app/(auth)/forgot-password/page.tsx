@@ -26,7 +26,7 @@ export default function ForgotPasswordPage() {
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center px-4 bg-slate-50">
+    <main className="min-h-viewport flex items-center justify-center px-4 pt-[max(2rem,env(safe-area-inset-top))] pb-[max(2rem,env(safe-area-inset-bottom))] bg-slate-50">
       <div className="w-full max-w-sm bg-white p-6 sm:p-8 rounded-xl shadow-sm border space-y-5">
         <div>
           <h1 className="text-2xl font-bold text-kodspot">Forgot password</h1>
@@ -58,7 +58,7 @@ export default function ForgotPasswordPage() {
                 autoFocus
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
+                className="w-full px-3 py-2 border rounded-md text-base sm:text-sm focus:outline-none focus:ring-2 focus:ring-kodspot/30"
               />
             </div>
             <button

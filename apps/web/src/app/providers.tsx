@@ -8,7 +8,15 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <QueryClientProvider client={qc}>
       {children}
-      <Toaster richColors position="top-right" />
+      <Toaster
+        richColors
+        position="top-right"
+        mobileOffset={{
+          top: 'calc(16px + env(safe-area-inset-top, 0px))',
+          right: 'calc(16px + env(safe-area-inset-right, 0px))',
+          left: 'calc(16px + env(safe-area-inset-left, 0px))',
+        }}
+      />
     </QueryClientProvider>
   );
 }

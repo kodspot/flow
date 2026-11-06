@@ -16,6 +16,11 @@ export function PwaRegister() {
           // ignore — SW is progressive enhancement
         });
     };
+    // This effect usually runs after the page has already loaded, when `load` won't fire again.
+    if (document.readyState === 'complete') {
+      onLoad();
+      return;
+    }
     window.addEventListener('load', onLoad);
     return () => window.removeEventListener('load', onLoad);
   }, []);

@@ -2,7 +2,7 @@
 import Link from 'next/link';
 import { useRouter, usePathname } from 'next/navigation';
 import { useEffect, useState } from 'react';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api, clearToken, getToken } from '@/lib/api';
 import { useBodyScrollLock } from '@/lib/useBodyScrollLock';
 import {
@@ -37,8 +37,16 @@ interface MeResponse {
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
+  const qc = useQueryClient();
   const [authed, setAuthed] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+
+  // Drop this account's cached data so the next person to sign in never sees it.
+  const signOut = () => {
+    clearToken();
+    qc.clear();
+    router.replace('/login');
+  };
 
   useEffect(() => {
     if (!getToken()) {
@@ -103,7 +111,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
         email={data?.user.email ?? ''}
         workspaceName={data?.workspace.name ?? ''}
         plan={data?.workspace.plan ?? ''}
-        onSignOut={() => { clearToken(); router.push('/login'); }}
+        onSignOut={signOut}
       />
     </>
   );
@@ -171,7 +179,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           email={data?.user.email ?? ''}
           workspaceName={data?.workspace.name ?? ''}
           plan={data?.workspace.plan ?? ''}
-          onSignOut={() => { clearToken(); router.push('/login'); }}
+          onSignOut={signOut}
         />
       </aside>
 

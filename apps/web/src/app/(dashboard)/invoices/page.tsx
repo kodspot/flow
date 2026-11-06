@@ -37,16 +37,27 @@ const STATUS_FILTERS: Array<{ value: string; label: string }> = [
   { value: 'cancelled', label: 'Cancelled' },
 ];
 
+const PAGE_SIZE = 200; // the API's maximum per request
+
+/** Every invoice (newest first), page by page: the list and its search cover all of them. */
+async function fetchAllInvoices(status: string): Promise<{ invoices: Invoice[] }> {
+  const invoices: Invoice[] = [];
+  for (let offset = 0; ; offset += PAGE_SIZE) {
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(offset) });
+    if (status !== 'all') params.set('status', status);
+    const page = await api<{ invoices: Invoice[] }>(`/v1/invoices?${params}`);
+    invoices.push(...page.invoices);
+    if (page.invoices.length < PAGE_SIZE) return { invoices };
+  }
+}
+
 export default function InvoicesPage() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [search, setSearch] = useState('');
 
   const { data, isLoading, error } = useQuery({
     queryKey: ['invoices', statusFilter],
-    queryFn: () =>
-      api<{ invoices: Invoice[] }>(
-        statusFilter === 'all' ? '/v1/invoices' : `/v1/invoices?status=${statusFilter}`,
-      ),
+    queryFn: () => fetchAllInvoices(statusFilter),
   });
 
   const { data: clientsData } = useQuery({

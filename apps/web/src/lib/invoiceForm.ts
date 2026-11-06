@@ -146,15 +146,25 @@ export function todayIsoDate(now: Date = new Date()): string {
   return `${y}-${m}-${d}`;
 }
 
-export function emptyInvoiceForm(): InvoiceFormValues {
+/** Invoice defaults from Company settings; any that are empty fall back to the built-in text. */
+export interface CompanyInvoiceDefaults {
+  defaultPlaceOfSupply?: string | null;
+  defaultGstNote?: string | null;
+  defaultInvoiceNotes?: string | null;
+}
+
+const orFallback = (value: string | null | undefined, fallback: string) =>
+  value && value.trim() !== '' ? value : fallback;
+
+export function emptyInvoiceForm(company: CompanyInvoiceDefaults = {}): InvoiceFormValues {
   return {
     clientId: '',
     invoiceDate: todayIsoDate(),
-    placeOfSupply: 'Karnataka (29)',
+    placeOfSupply: orFallback(company.defaultPlaceOfSupply, 'Karnataka (29)'),
     gstApplicable: false,
     gstRatePercent: 18,
-    gstNote: defaultGstNote,
-    notes: defaultNotes,
+    gstNote: orFallback(company.defaultGstNote, defaultGstNote),
+    notes: orFallback(company.defaultInvoiceNotes, defaultNotes),
     internalNotesPlain: '',
     columns: defaultInvoiceTableMeta().columns,
     extraTables: [],

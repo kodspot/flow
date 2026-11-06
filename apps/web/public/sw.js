@@ -1,10 +1,10 @@
-# PWA service worker — cache-first for static assets, network-first for API.
-# Hosted at /sw.js so it controls the entire origin scope.
-self.addEventListener('install', (e) => self.skipWaiting());
+// PWA service worker — cache-first for static assets, network-first for page navigations.
+// API requests are never handled here. Hosted at /sw.js so it controls the entire origin scope.
+self.addEventListener('install', () => self.skipWaiting());
 self.addEventListener('activate', (e) => e.waitUntil(self.clients.claim()));
 
-const STATIC_CACHE = 'kodspot-flow-static-v1';
-const RUNTIME_CACHE = 'kodspot-flow-runtime-v1';
+const STATIC_CACHE = 'kodspot-flow-static-v2';
+const RUNTIME_CACHE = 'kodspot-flow-runtime-v2';
 
 const PRECACHE_URLS = [
   '/',
@@ -43,8 +43,8 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return;
   const url = new URL(req.url);
 
-  // Never cache auth or invoice/PDF API calls (data must be fresh + auth-gated)
-  if (url.hostname.includes('api.flow.kodspot.co.in')) return;
+  // Only this origin: the API (auth, invoices, PDFs) must always be fresh and auth-gated.
+  if (url.origin !== self.location.origin) return;
   if (url.pathname.startsWith('/api/')) return;
 
   // HTML navigations: network-first, fall back to cache
@@ -52,8 +52,10 @@ self.addEventListener('fetch', (event) => {
     event.respondWith(
       fetch(req)
         .then((res) => {
-          const copy = res.clone();
-          caches.open(RUNTIME_CACHE).then((c) => c.put(req, copy));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(RUNTIME_CACHE).then((c) => c.put(req, copy));
+          }
           return res;
         })
         .catch(() => caches.match(req).then((r) => r || caches.match('/'))),
@@ -62,16 +64,15 @@ self.addEventListener('fetch', (event) => {
   }
 
   // Static assets: cache-first
-  if (
-    url.origin === self.location.origin &&
-    /\.(?:js|css|woff2?|ttf|png|jpg|jpeg|svg|webp|ico|webmanifest)$/i.test(url.pathname)
-  ) {
+  if (/\.(?:js|css|woff2?|ttf|png|jpg|jpeg|svg|webp|ico|webmanifest)$/i.test(url.pathname)) {
     event.respondWith(
       caches.match(req).then((cached) => {
         if (cached) return cached;
         return fetch(req).then((res) => {
-          const copy = res.clone();
-          caches.open(STATIC_CACHE).then((c) => c.put(req, copy));
+          if (res.ok) {
+            const copy = res.clone();
+            caches.open(STATIC_CACHE).then((c) => c.put(req, copy));
+          }
           return res;
         });
       }),

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { api } from '@/lib/api';
+import { api, setToken } from '@/lib/api';
 import { toast } from 'sonner';
 import { UserCircle, KeyRound, ShieldCheck } from 'lucide-react';
 
@@ -38,12 +38,14 @@ export default function AccountPage() {
 
   const changePassword = useMutation({
     mutationFn: () =>
-      api('/v1/auth/change-password', {
+      api<{ ok: true; token?: string }>('/v1/auth/change-password', {
         method: 'POST',
         body: JSON.stringify({ currentPassword, newPassword }),
       }),
-    onSuccess: () => {
-      toast.success('Password updated');
+    onSuccess: (res) => {
+      // Other sessions are signed out; this device continues with the token issued at the change.
+      if (res.token) setToken(res.token);
+      toast.success('Password updated. Other devices have been signed out.');
       setCurrentPassword('');
       setNewPassword('');
       setConfirmPassword('');

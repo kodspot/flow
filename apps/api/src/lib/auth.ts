@@ -6,16 +6,43 @@ export interface JwtPayload {
   role: 'owner' | 'admin' | 'member';
   email: string;
   exp: number;
+  iat?: number;         // issued at (seconds); absent on tokens issued before it was added
+  iatMs?: number;       // issued at (milliseconds), so a password change in the same second still counts
 }
 
 const TOKEN_TTL_SECONDS = 60 * 60 * 24 * 7; // 7 days
 
 export async function signJwt(
   secret: string,
-  payload: Omit<JwtPayload, 'exp'>,
+  payload: Omit<JwtPayload, 'exp' | 'iat' | 'iatMs'>,
+  issuedAtMs: number = Date.now(),
 ): Promise<string> {
-  const exp = Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS;
-  return jwt.sign({ ...payload, exp }, secret);
+  const iat = Math.floor(issuedAtMs / 1000);
+  return jwt.sign({ ...payload, iat, iatMs: issuedAtMs, exp: iat + TOKEN_TTL_SECONDS }, secret);
+}
+
+/*
+ * Password changes end other sessions: the time of the latest change is kept in KV, and tokens
+ * issued before it are refused. The record only needs to outlive the tokens it revokes.
+ */
+const PASSWORD_CHANGED_PREFIX = 'pwchanged:';
+
+/** Record a password change for `userId`; returns the change time (ms) to issue the new token at. */
+export async function markPasswordChanged(kv: KVNamespace, userId: string): Promise<number> {
+  const at = Date.now();
+  await kv.put(`${PASSWORD_CHANGED_PREFIX}${userId}`, String(at), {
+    expirationTtl: TOKEN_TTL_SECONDS + 60 * 60,
+  });
+  return at;
+}
+
+/** True when the token was issued before the user's latest password change. */
+export async function issuedBeforePasswordChange(kv: KVNamespace, payload: JwtPayload): Promise<boolean> {
+  const changedAt = await kv.get(`${PASSWORD_CHANGED_PREFIX}${payload.sub}`);
+  if (changedAt === null) return false;
+  // Older tokens carry only `iat` (seconds), or nothing at all.
+  const issuedAtMs = payload.iatMs ?? (payload.iat ?? 0) * 1000;
+  return issuedAtMs < Number(changedAt);
 }
 
 export async function verifyJwt(secret: string, token: string): Promise<JwtPayload | null> {

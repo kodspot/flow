@@ -34,6 +34,23 @@ describe('renderInvoiceHtml', () => {
     expect(render()).toContain('10 days');
   });
 
+  it('prints the GST exemption declaration only when no GST is charged', () => {
+    const html = (gstApplicable: boolean) =>
+      renderInvoiceHtml({
+        invoice: {
+          invoiceNumber: 'KOD/INV/2026/002', invoiceDate: Date.UTC(2026, 9, 1), dueDate: null, placeOfSupply: null,
+          subtotalPaise: 100_000, gstApplicable, gstRatePercent: gstApplicable ? 1800 : 0, gstAmountPaise: gstApplicable ? 18_000 : 0,
+          gstNote: 'Exempt under Section 22', totalPaise: 118_000, amountInWords: '', notes: null, internalNotes: null,
+        },
+        items: [{ position: 0, description: 'X', period: null, rateLabel: null, ratePaise: null, days: null, quantity: 1, amountPaise: 100_000 }],
+        client: { name: 'BHEL', company: null, addressLine1: null, addressLine2: null, city: null, state: null, postalCode: null, gstNumber: null },
+        company: { brandName: 'KODSPOT' },
+      } as unknown as RenderInvoiceArgs);
+    // An older invoice may carry both; the declaration must not appear next to charged GST.
+    expect(html(true)).not.toContain('GST Compliance Declaration');
+    expect(html(false)).toContain('Exempt under Section 22');
+  });
+
   it('shows the rate amount when there is no rate text', () => {
     expect(render()).toContain('₹5,000');
   });

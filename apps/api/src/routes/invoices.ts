@@ -1,7 +1,7 @@
 import { Hono } from 'hono';
 import { and, eq, isNull } from 'drizzle-orm';
 import { invoiceCreateSchema, invoiceUpdateSchema, invoiceStatusUpdateSchema } from '@kodspot/shared/schemas';
-import { getDb } from '../db/client.js';
+import { getDb, type DB } from '../db/client.js';
 import * as s from '../db/schema.js';
 import { authMiddleware } from '../middleware/auth.js';
 import {
@@ -21,9 +21,17 @@ import type { Env, AppVariables } from '../env.js';
 const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 app.use('*', authMiddleware);
 
-/** Read an R2 asset and return it as a base64 data URL for inline embedding in HTML. */
-async function r2KeyToDataUrl(bucket: R2Bucket, key: string | null | undefined): Promise<string | null> {
-  if (!key) return null;
+/**
+ * Read a workspace's R2 branding asset and return it as a base64 data URL for inline embedding.
+ * Keys outside `branding/<workspaceId>/` are ignored, so a stored key can never pull in
+ * another workspace's logo or signature.
+ */
+async function r2KeyToDataUrl(
+  bucket: R2Bucket,
+  workspaceId: string,
+  key: string | null | undefined,
+): Promise<string | null> {
+  if (!key || !key.startsWith(`branding/${workspaceId}/`)) return null;
   const obj = await bucket.get(key);
   if (!obj) return null;
   const ct = obj.httpMetadata?.contentType ?? 'image/png';
@@ -37,6 +45,43 @@ async function r2KeyToDataUrl(bucket: R2Bucket, key: string | null | undefined):
   return `data:${ct};base64,${btoa(binary)}`;
 }
 
+type InvoiceRow = typeof s.invoices.$inferSelect;
+type ClientRow = typeof s.clients.$inferSelect;
+
+/**
+ * The customer details an invoice shows. Drafts use the customer's current record; once an
+ * invoice is issued it shows the copy saved on it (taken when it left draft), so later edits
+ * to the customer don't change invoices already sent.
+ */
+async function billedClient(db: DB, workspaceId: string, invoice: InvoiceRow): Promise<ClientRow | null> {
+  if (invoice.status !== 'draft') {
+    try {
+      const snap = JSON.parse(invoice.clientSnapshot) as ClientRow;
+      if (snap && typeof snap.name === 'string') return snap;
+    } catch {
+      // Fall back to the live record below.
+    }
+  }
+  const client = await db.query.clients.findFirst({
+    where: and(eq(s.clients.id, invoice.clientId), eq(s.clients.workspaceId, workspaceId)),
+  });
+  return client ?? null;
+}
+
+/** Everything renderInvoiceHtml needs besides the invoice and items. */
+async function renderInputs(env: Env, db: DB, workspaceId: string, invoice: InvoiceRow) {
+  const company = await db.query.companyProfiles.findFirst({
+    where: eq(s.companyProfiles.workspaceId, workspaceId),
+  });
+  const client = await billedClient(db, workspaceId, invoice);
+  if (!company || !client) return null;
+  const [logoDataUrl, signatureDataUrl] = await Promise.all([
+    r2KeyToDataUrl(env.ASSETS, workspaceId, company.logoR2Key),
+    r2KeyToDataUrl(env.ASSETS, workspaceId, company.signatureR2Key),
+  ]);
+  return { company, client, logoDataUrl, signatureDataUrl };
+}
+
 app.get('/dashboard', async (c) => {
   const { workspaceId } = c.get('auth');
   const stats = await getDashboardStats(getDb(c.env.DB), workspaceId);
@@ -46,8 +91,8 @@ app.get('/dashboard', async (c) => {
 app.get('/', async (c) => {
   const { workspaceId } = c.get('auth');
   const status = c.req.query('status') ?? undefined;
-  const limit = Number(c.req.query('limit') ?? 50);
-  const offset = Number(c.req.query('offset') ?? 0);
+  const limit = Number(c.req.query('limit') ?? 50) || 50;
+  const offset = Math.max(0, Number(c.req.query('offset') ?? 0) || 0);
   const rows = await listInvoices(getDb(c.env.DB), workspaceId, { status, limit, offset });
   return c.json({ invoices: rows });
 });
@@ -96,10 +141,19 @@ app.patch('/:id/status', async (c) => {
     ),
   });
   if (!existing) return c.json({ error: 'Not found' }, 404);
+  // Leaving draft issues the invoice: freeze the customer's details as they are now.
+  let clientSnapshot: string | undefined;
+  if (existing.status === 'draft' && parsed.data.status !== 'draft') {
+    const client = await db.query.clients.findFirst({
+      where: and(eq(s.clients.id, existing.clientId), eq(s.clients.workspaceId, workspaceId)),
+    });
+    if (client) clientSnapshot = JSON.stringify(client);
+  }
   await db
     .update(s.invoices)
     .set({
       status: parsed.data.status,
+      clientSnapshot,
       // Stamp paidAt only on the transition into 'paid'; clear when leaving 'paid'
       paidAt: parsed.data.status === 'paid' ? Date.now() : parsed.data.status === existing.status ? undefined : null,
       updatedAt: Date.now(),
@@ -139,25 +193,13 @@ app.get('/:id/preview', async (c) => {
   const db = getDb(c.env.DB);
   const data = await getInvoiceWithItems(db, workspaceId, c.req.param('id'));
   if (!data) return c.json({ error: 'Not found' }, 404);
-  const company = await db.query.companyProfiles.findFirst({
-    where: eq(s.companyProfiles.workspaceId, workspaceId),
-  });
-  const client = await db.query.clients.findFirst({
-    where: eq(s.clients.id, data.invoice.clientId),
-  });
-  if (!company || !client) return c.json({ error: 'Missing data' }, 400);
-  const [logoDataUrl, signatureDataUrl] = await Promise.all([
-    r2KeyToDataUrl(c.env.ASSETS, company.logoR2Key),
-    r2KeyToDataUrl(c.env.ASSETS, company.signatureR2Key),
-  ]);
+  const inputs = await renderInputs(c.env, db, workspaceId, data.invoice);
+  if (!inputs) return c.json({ error: 'Missing data' }, 400);
   const html = renderInvoiceHtml({
     invoice: data.invoice,
     items: data.items,
-    client,
-    company,
+    ...inputs,
     showDraftWatermark: data.invoice.status === 'draft',
-    logoDataUrl,
-    signatureDataUrl,
   });
   return c.html(html);
 });
@@ -173,26 +215,13 @@ app.post('/:id/pdf', async (c) => {
   const data = await getInvoiceWithItems(db, workspaceId, id);
   if (!data) return c.json({ error: 'Not found' }, 404);
 
-  const company = await db.query.companyProfiles.findFirst({
-    where: eq(s.companyProfiles.workspaceId, workspaceId),
-  });
-  const client = await db.query.clients.findFirst({
-    where: eq(s.clients.id, data.invoice.clientId),
-  });
-  if (!company || !client) return c.json({ error: 'Missing data' }, 400);
-
-  const [logoDataUrl, signatureDataUrl] = await Promise.all([
-    r2KeyToDataUrl(c.env.ASSETS, company.logoR2Key),
-    r2KeyToDataUrl(c.env.ASSETS, company.signatureR2Key),
-  ]);
+  const inputs = await renderInputs(c.env, db, workspaceId, data.invoice);
+  if (!inputs) return c.json({ error: 'Missing data' }, 400);
   const html = renderInvoiceHtml({
     invoice: data.invoice,
     items: data.items,
-    client,
-    company,
+    ...inputs,
     showDraftWatermark: false,
-    logoDataUrl,
-    signatureDataUrl,
   });
 
   const pdfSvc = new PdfService(c.env.BROWSER as never);

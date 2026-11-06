@@ -162,6 +162,16 @@ pnpm typecheck
 - **Hidden columns** (unticked Days, Quantity, Period, Rate, custom) hide their inputs and are left off the invoice page, preview and PDF, but their values are kept: saved, restored when the column is ticked again, and carried into copies. Totals come only from each item's Amount (+ GST).
 - **Create a copy** (invoice page or invoice list, any status) opens a pre-filled New invoice: customer, items, column settings, additional tables, tax settings and notes; the invoice date is set to today and periods are flagged for review. Saving creates a separate draft with a new id and number; the source invoice, its status, payments and PDF are never touched or copied.
 - **Preview** lays the A4 sheet out at 840px wide on screens so phones open the whole page fitted (pinch-zoom available); print/PDF use `@page A4` and are unaffected.
+- **GST note** is an exemption declaration: it is stored and printed only on invoices that charge no GST.
+- **Customer details** on a draft follow the customer's current record; when an invoice leaves draft (e.g. Mark sent) they are frozen onto it, so later edits to the customer don't change issued invoices.
+- **Company defaults** (Settings → Invoice Defaults) prefill New invoice: place of supply, GST note and footer note. *Default Due Days* sets the due date (invoice date + N days) when an invoice has none.
+- **Dashboard "Total invoiced"** excludes cancelled invoices.
+
+## 🔐 Sessions
+
+- Email addresses are case-insensitive (stored lowercased; older mixed-case accounts still sign in).
+- Changing or resetting a password signs out every other session: the change time is kept in KV (`pwchanged:<userId>`, for the 7-day token lifetime) and older tokens are refused with `401 session_expired`. The device that changed the password continues with a fresh token.
+- On `session_expired` the web app clears the token and returns to sign-in; signing out or in also clears all cached data in the browser.
 
 ## 📱 Responsive / mobile conventions (`apps/web`)
 

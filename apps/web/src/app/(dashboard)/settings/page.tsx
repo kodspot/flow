@@ -2,6 +2,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { useEffect, useRef, useState } from 'react';
 import { api, fetchAssetBlobUrl } from '@/lib/api';
+import { fillBlanks, toSavePayload } from '@/lib/companySettings';
 import { toast } from 'sonner';
 
 type Profile = {
@@ -109,20 +110,34 @@ export default function SettingsPage() {
     queryFn: () => api<{ profile: Profile }>('/v1/settings/company'),
   });
   const [form, setForm] = useState<Profile>({});
+  const loaded = useRef(false);
 
-  useEffect(() => { if (data?.profile) setForm(data.profile); }, [data]);
+  // Fill the form once, when the profile first arrives. Later refetches (after a logo upload,
+  // or on returning to the app) must not replace what the user is typing.
+  useEffect(() => {
+    if (data?.profile && !loaded.current) {
+      loaded.current = true;
+      setForm(data.profile);
+    }
+  }, [data]);
 
   const save = useMutation({
-    mutationFn: () => api('/v1/settings/company', { method: 'PUT', body: JSON.stringify(form) }),
+    mutationFn: () => api('/v1/settings/company', { method: 'PUT', body: JSON.stringify(toSavePayload(form)) }),
     onSuccess: () => { toast.success('Saved'); qc.invalidateQueries({ queryKey: ['settings'] }); },
     onError: (e) => toast.error((e as Error).message),
   });
 
   const seed = useMutation({
     mutationFn: () => api<{ ok: boolean; fieldsUpdated: number }>('/v1/settings/seed-kodspot', { method: 'POST' }),
-    onSuccess: (res) => {
+    onSuccess: async (res) => {
       toast.success(`Filled ${res.fieldsUpdated} field(s) with KODSPOT defaults`);
-      qc.invalidateQueries({ queryKey: ['settings'] });
+      // The server only fills blank fields; bring those into the form and keep other edits.
+      const fresh = await qc.fetchQuery({
+        queryKey: ['settings'],
+        queryFn: () => api<{ profile: Profile }>('/v1/settings/company'),
+        staleTime: 0,
+      });
+      setForm((f) => fillBlanks(f, fresh.profile));
     },
     onError: (e) => toast.error((e as Error).message),
   });

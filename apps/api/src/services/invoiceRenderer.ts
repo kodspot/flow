@@ -174,7 +174,9 @@ export function renderInvoiceHtml(args: RenderInvoiceArgs): string {
     dueDateFormatted: fmtDate(invoice.dueDate ?? undefined),
     placeOfSupply: invoice.placeOfSupply,
     notes: invoice.notes,
-    gstNote: invoice.gstNote,
+    // The note is a GST-exemption declaration; it must not appear when GST is charged
+    // (older invoices may still carry one).
+    gstNote: invoice.gstApplicable ? null : invoice.gstNote,
     amountInWords: invoice.amountInWords || amountInWords(invoice.totalPaise),
     subtotalFormatted: formatINRCompact(invoice.subtotalPaise),
     gstDisplay,

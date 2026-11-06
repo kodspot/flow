@@ -38,19 +38,29 @@ export class IdempotencyConflictError extends Error {
 
 type CompanyDefaults = Pick<
   typeof s.companyProfiles.$inferSelect,
-  'defaultPlaceOfSupply' | 'defaultGstNote' | 'defaultInvoiceNotes'
+  'defaultPlaceOfSupply' | 'defaultGstNote' | 'defaultInvoiceNotes' | 'defaultDueDays'
 >;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Due date from the request, else the company's default payment term (0 = none). */
+function dueDateFor(dueDate: string | null | undefined, invoiceDateMs: number, company: CompanyDefaults) {
+  if (dueDate) return toDateMs(dueDate);
+  return company.defaultDueDays > 0 ? invoiceDateMs + company.defaultDueDays * DAY_MS : null;
+}
 
 /** What a create request stores (invoice fields + items), with the same defaults as the insert. */
 function contentFromInput(input: InvoiceCreateInput, company: CompanyDefaults) {
+  const invoiceDate = toDateMs(input.invoiceDate);
   return {
     clientId: input.clientId,
-    invoiceDate: toDateMs(input.invoiceDate),
-    dueDate: input.dueDate ? toDateMs(input.dueDate) : null,
+    invoiceDate,
+    dueDate: dueDateFor(input.dueDate, invoiceDate, company),
     placeOfSupply: input.placeOfSupply ?? company.defaultPlaceOfSupply ?? null,
     gstApplicable: input.gstApplicable,
     gstRatePercent: input.gstApplicable ? Math.round(input.gstRatePercent * 100) : 0, // basis points x100
-    gstNote: input.gstNote ?? company.defaultGstNote ?? null,
+    // The GST note is an exemption declaration: never put it on an invoice that charges GST.
+    gstNote: input.gstApplicable ? null : (input.gstNote ?? company.defaultGstNote ?? null),
     notes: input.notes ?? company.defaultInvoiceNotes ?? null,
     internalNotes: input.internalNotes ?? null,
     items: input.items.map((it) => ({
@@ -271,6 +281,8 @@ export async function getDashboardStats(db: DB, workspaceId: string) {
   for (const r of rows) {
     const k = r.status as keyof typeof stats;
     if (k in stats) stats[k] = { count: Number(r.count), amount: Number(r.total) };
+    // Cancelled invoices are void: they stay in their own bucket but not in the total.
+    if (k === 'cancelled') continue;
     stats.total.count += Number(r.count);
     stats.total.amount += Number(r.total);
   }
@@ -318,9 +330,20 @@ export async function updateInvoice(
   const total = subtotal + gstAmount;
 
   const invoiceDateMs = input.invoiceDate ? toDateMs(input.invoiceDate) : existing.invoiceDate;
+  const company = await db.query.companyProfiles.findFirst({
+    where: eq(s.companyProfiles.workspaceId, workspaceId),
+  });
+  const defaultDays = company?.defaultDueDays ?? 0;
+  // A due date derived from the company's payment term follows the invoice date; one that was
+  // set explicitly is kept.
+  const derivedDue =
+    existing.dueDate === null ||
+    (defaultDays > 0 && existing.dueDate === existing.invoiceDate + defaultDays * DAY_MS);
   const dueDateMs =
     input.dueDate === undefined
-      ? existing.dueDate
+      ? derivedDue
+        ? defaultDays > 0 ? invoiceDateMs + defaultDays * DAY_MS : existing.dueDate
+        : existing.dueDate
       : input.dueDate === null
       ? null
       : toDateMs(input.dueDate);
@@ -339,7 +362,8 @@ export async function updateInvoice(
         gstApplicable,
         gstRatePercent: gstRateBp,
         gstAmountPaise: gstAmount,
-        gstNote: input.gstNote ?? existing.gstNote,
+        // Exemption declaration only applies when no GST is charged.
+        gstNote: gstApplicable ? null : (input.gstNote ?? existing.gstNote),
         totalPaise: total,
         amountInWords: amountInWords(total),
         notes: input.notes ?? existing.notes,

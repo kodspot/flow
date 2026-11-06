@@ -28,10 +28,14 @@ app.put('/company', async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = companyProfileUpdateSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'Invalid input', issues: parsed.error.issues }, 400);
+  // Branding asset keys are set only by the upload/delete endpoints below, which check that the
+  // file belongs to this workspace; a profile save can't point them at anything else (or write
+  // back a stale key from a form opened before an upload).
+  const { logoR2Key: _logo, signatureR2Key: _signature, upiQrR2Key: _upiQr, ...profile } = parsed.data;
   const db = getDb(c.env.DB);
   await db
     .update(s.companyProfiles)
-    .set({ ...parsed.data, updatedAt: Date.now() })
+    .set({ ...profile, updatedAt: Date.now() })
     .where(eq(s.companyProfiles.workspaceId, workspaceId));
   return c.json({ ok: true });
 });

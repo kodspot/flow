@@ -1,5 +1,5 @@
 import { Hono } from 'hono';
-import { eq } from 'drizzle-orm';
+import { eq, sql } from 'drizzle-orm';
 import { nanoid } from 'nanoid';
 import {
   signupSchema,
@@ -11,7 +11,7 @@ import {
 } from '@kodspot/shared/schemas';
 import { getDb } from '../db/client.js';
 import * as s from '../db/schema.js';
-import { hashPassword, verifyPassword, signJwt } from '../lib/auth.js';
+import { hashPassword, verifyPassword, signJwt, markPasswordChanged } from '../lib/auth.js';
 import { sendEmail, passwordResetEmailHtml } from '../lib/email.js';
 import { authMiddleware } from '../middleware/auth.js';
 import type { Env, AppVariables } from '../env.js';
@@ -20,6 +20,14 @@ const app = new Hono<{ Bindings: Env; Variables: AppVariables }>();
 
 const RESET_TOKEN_TTL_SECONDS = 30 * 60; // 30 minutes
 const RESET_TOKEN_KV_PREFIX = 'pwreset:';
+
+/** Email addresses are case-insensitive: stored lowercased, matched ignoring case. */
+const normalizeEmail = (email: string) => email.trim().toLowerCase();
+
+/** Users whose email matches ignoring case (older accounts may be stored with capitals). */
+function usersByEmail(db: ReturnType<typeof getDb>, email: string) {
+  return db.query.users.findMany({ where: sql`lower(${s.users.email}) = ${normalizeEmail(email)}` });
+}
 
 async function sha256Hex(input: string): Promise<string> {
   const buf = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(input));
@@ -32,11 +40,12 @@ app.post('/signup', async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = signupSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'Invalid input', issues: parsed.error.issues }, 400);
-  const { name, email, password, workspaceName } = parsed.data;
+  const { name, password, workspaceName } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
 
   const db = getDb(c.env.DB);
-  const existing = await db.query.users.findFirst({ where: eq(s.users.email, email) });
-  if (existing) return c.json({ error: 'Email already registered' }, 409);
+  const existing = await usersByEmail(db, email);
+  if (existing.length > 0) return c.json({ error: 'Email already registered' }, 409);
 
   const workspaceId = nanoid(16);
   const userId = nanoid(16);
@@ -91,11 +100,15 @@ app.post('/login', async (c) => {
   const { email, password } = parsed.data;
 
   const db = getDb(c.env.DB);
-  const user = await db.query.users.findFirst({ where: eq(s.users.email, email) });
+  // Normally one match; older data may hold the same address in different capitalisation.
+  let user: (typeof s.users.$inferSelect) | undefined;
+  for (const candidate of await usersByEmail(db, email)) {
+    if (await verifyPassword(password, candidate.passwordHash)) {
+      user = candidate;
+      break;
+    }
+  }
   if (!user) return c.json({ error: 'Invalid credentials' }, 401);
-
-  const ok = await verifyPassword(password, user.passwordHash);
-  if (!ok) return c.json({ error: 'Invalid credentials' }, 401);
 
   await db.update(s.users).set({ lastLoginAt: Date.now() }).where(eq(s.users.id, user.id));
 
@@ -137,19 +150,19 @@ app.post('/forgot-password', async (c) => {
   const body = await c.req.json().catch(() => null);
   const parsed = forgotPasswordSchema.safeParse(body);
   if (!parsed.success) return c.json({ error: 'Invalid input' }, 400);
-  const { email } = parsed.data;
+  const email = normalizeEmail(parsed.data.email);
 
   // Light rate limit per email — KV-backed, 5 requests / 15 min
-  const rlKey = `pwreset_rl:${email.toLowerCase()}`;
+  const rlKey = `pwreset_rl:${email}`;
   const count = Number((await c.env.KV.get(rlKey)) ?? 0);
   if (count >= 5) return c.json({ ok: true });
   await c.env.KV.put(rlKey, String(count + 1), { expirationTtl: 15 * 60 });
 
   const db = getDb(c.env.DB);
-  const user = await db.query.users.findFirst({ where: eq(s.users.email, email) });
+  const matches = await usersByEmail(db, email);
 
   // Always respond ok — but only do work if user exists.
-  if (user) {
+  for (const user of matches) {
     const token = nanoid(48);
     const tokenHash = await sha256Hex(token);
     await c.env.KV.put(
@@ -208,6 +221,8 @@ app.post('/reset-password', async (c) => {
 
   // Single-use: delete the token immediately.
   await c.env.KV.delete(kvKey);
+  // A reset ends every existing session (including one someone else may hold).
+  await markPasswordChanged(c.env.KV, userId);
 
   return c.json({ ok: true });
 });
@@ -236,7 +251,14 @@ app.post('/change-password', authMiddleware, async (c) => {
     .set({ passwordHash: newHash, updatedAt: Date.now() })
     .where(eq(s.users.id, userId));
 
-  return c.json({ ok: true });
+  // End other sessions; this device continues with a token issued at the change.
+  const changedAt = await markPasswordChanged(c.env.KV, userId);
+  const token = await signJwt(
+    c.env.JWT_SECRET,
+    { sub: user.id, wsId: user.workspaceId, role: user.role, email: user.email },
+    changedAt,
+  );
+  return c.json({ ok: true, token });
 });
 
 /** Update profile (display name) for the current user. */

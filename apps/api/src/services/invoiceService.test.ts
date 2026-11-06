@@ -26,7 +26,8 @@ function fakeStore({
   batchDelayMs = 0,
   companyDelayMs = 0,
   failBatch,
-}: { batchDelayMs?: number; companyDelayMs?: number; failBatch?: Error } = {}) {
+  defaultDueDays = 0,
+}: { batchDelayMs?: number; companyDelayMs?: number; failBatch?: Error; defaultDueDays?: number } = {}) {
   const invoices: Values[] = [];
   const items: Values[] = [];
   const db = {
@@ -34,7 +35,7 @@ function fakeStore({
       companyProfiles: {
         findFirst: async () => {
           await new Promise((r) => setTimeout(r, companyDelayMs));
-          return { invoiceNumberPrefix: 'KOD/INV', defaultPlaceOfSupply: 'Karnataka (29)', defaultGstNote: 'GST note', defaultInvoiceNotes: 'Thanks' };
+          return { invoiceNumberPrefix: 'KOD/INV', defaultPlaceOfSupply: 'Karnataka (29)', defaultGstNote: 'GST note', defaultInvoiceNotes: 'Thanks', defaultDueDays };
         },
       },
       clients: { findFirst: async () => ({ id: 'client_1', name: 'BHEL' }) },
@@ -180,6 +181,32 @@ describe('createInvoice', () => {
     expect(a.id).not.toBe(b.id);
     expect(a.invoiceNumber).not.toBe(b.invoiceNumber);
     expect(store.invoices).toHaveLength(2);
+  });
+
+  it('never stores the GST exemption note on an invoice that charges GST', async () => {
+    const store = fakeStore();
+    // The company has a default exemption note, and the web form sends gstNote: null with GST on.
+    await createInvoice(store, 'ws_1', { ...input, gstApplicable: true, gstRatePercent: 18, gstNote: null, idempotencyKey: 'g1' });
+    await createInvoice(store, 'ws_1', { ...input, gstApplicable: true, gstRatePercent: 18, gstNote: 'Exempt', idempotencyKey: 'g2' });
+    await createInvoice(store, 'ws_1', { ...input, idempotencyKey: 'e1' });
+
+    expect(store.invoices.map((i) => i.gstNote)).toEqual([null, null, 'GST note']);
+    expect(store.invoices[0]).toMatchObject({ gstApplicable: true, gstRatePercent: 1800, gstAmountPaise: 900_000 });
+    // A same-details retry of the GST invoice still resolves to it (content rules match the insert).
+    const retry = await createInvoice(store, 'ws_1', { ...input, gstApplicable: true, gstRatePercent: 18, gstNote: null, idempotencyKey: 'g1' });
+    expect(retry.id).toBe(store.invoices[0]!.id);
+  });
+
+  it("applies the company's default payment term as the due date when none is given", async () => {
+    const store = fakeStore({ defaultDueDays: 15 });
+    await createInvoice(store, 'ws_1', { ...input, idempotencyKey: 'd1' });
+    await createInvoice(store, 'ws_1', { ...input, dueDate: '2026-11-05', idempotencyKey: 'd2' });
+    const none = fakeStore();
+    await createInvoice(none, 'ws_1', { ...input, idempotencyKey: 'd3' });
+
+    expect(store.invoices[0]!.dueDate).toBe(Date.UTC(2026, 10, 16));
+    expect(store.invoices[1]!.dueDate).toBe(Date.UTC(2026, 10, 5));
+    expect(none.invoices[0]!.dueDate).toBeNull();
   });
 
   it('still reports a failed write that is not a duplicate', async () => {

@@ -30,6 +30,30 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * The API reported this session as ended (expired, invalid, or the password was changed):
+ * drop the token and sign in again. A full page load also discards every cached query, so
+ * nothing from this session stays on screen.
+ */
+function endSession() {
+  clearToken();
+  if (!window.location.pathname.startsWith('/login')) window.location.assign('/login?expired=1');
+}
+
+function isSessionEnded(status: number, body: unknown): boolean {
+  return status === 401 && (body as { code?: string } | null)?.code === 'session_expired';
+}
+
+/** Error text for a failed response; names the first invalid field when the API lists them. */
+function errorMessage(status: number, body: unknown): string {
+  const b = (body ?? {}) as { error?: string; issues?: Array<{ path?: unknown[]; message?: string }> };
+  const base = b.error ?? `Request failed: ${status}`;
+  const issue = Array.isArray(b.issues) ? b.issues[0] : undefined;
+  if (!issue?.message) return base;
+  const field = Array.isArray(issue.path) && issue.path.length ? `${issue.path.join('.')}: ` : '';
+  return `${base} (${field}${issue.message})`;
+}
+
 export async function api<T = unknown>(
   path: string,
   init: RequestInit = {},
@@ -47,7 +71,8 @@ export async function api<T = unknown>(
   });
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw new ApiError((body as { error?: string }).error ?? `Request failed: ${res.status}`, res.status, body);
+    if (token && isSessionEnded(res.status, body)) endSession();
+    throw new ApiError(errorMessage(res.status, body), res.status, body);
   }
   if (res.status === 204) return undefined as T;
   return (await res.json()) as T;
@@ -67,7 +92,11 @@ export async function fetchAssetBlobUrl(path: string): Promise<string> {
   const res = await fetch(`${API_URL}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!res.ok) throw new Error(`Failed to load asset: ${res.status}`);
+  if (!res.ok) {
+    const body = await res.json().catch(() => null);
+    if (token && isSessionEnded(res.status, body)) endSession();
+    throw new Error(`Failed to load asset: ${res.status}`);
+  }
   const blob = await res.blob();
   return URL.createObjectURL(blob);
 }

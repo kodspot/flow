@@ -1,15 +1,23 @@
 'use client';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, setToken } from '@/lib/api';
 import { toast } from 'sonner';
 
 export default function LoginPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
+  const [sessionEnded, setSessionEnded] = useState(false);
+
+  // Set by the API client when a session ends (expired, or the password was changed elsewhere).
+  useEffect(() => {
+    setSessionEnded(new URLSearchParams(window.location.search).get('expired') === '1');
+  }, []);
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -19,6 +27,7 @@ export default function LoginPage() {
         method: 'POST',
         body: JSON.stringify({ email, password }),
       });
+      qc.clear(); // nothing cached from an earlier account may show for this one
       setToken(res.token);
       toast.success('Welcome back');
       router.push('/dashboard');
@@ -36,6 +45,11 @@ export default function LoginPage() {
           <h1 className="text-2xl font-bold text-kodspot">Sign in</h1>
           <p className="text-sm text-slate-500 mt-1">Welcome back to Kodspot Flow</p>
         </div>
+        {sessionEnded && (
+          <p role="status" className="rounded-md bg-amber-50 border border-amber-200 px-3 py-2 text-sm text-amber-900">
+            Your session has ended. Please sign in again.
+          </p>
+        )}
         <div className="space-y-2">
           <label className="text-sm font-medium">Email</label>
           <input

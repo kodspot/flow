@@ -2,11 +2,13 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { useQueryClient } from '@tanstack/react-query';
 import { api, setToken } from '@/lib/api';
 import { toast } from 'sonner';
 
 export default function SignupPage() {
   const router = useRouter();
+  const qc = useQueryClient();
   const [form, setForm] = useState({ name: '', email: '', password: '', workspaceName: 'Kodspot' });
   const [loading, setLoading] = useState(false);
 
@@ -18,6 +20,7 @@ export default function SignupPage() {
         method: 'POST',
         body: JSON.stringify(form),
       });
+      qc.clear(); // nothing cached from an earlier account may show for this one
       setToken(res.token);
       toast.success('Workspace created');
       router.push('/dashboard');
